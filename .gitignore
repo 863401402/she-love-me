@@ -1,0 +1,29 @@
+# 数据目录 - 包含个人微信数据，绝不入库
+vendor/
+data/
+reports/
+*.db
+*.json.bak
+all_keys.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code 本地设置（含个人权限配置，不入库）
+.claude/settings.local.json
+# 外部安装的 skills（不入库）
+.claude/skills/web-design-guidelines/

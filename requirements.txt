@@ -1,0 +1,4 @@
+# 本项目自身无 Python 依赖（标准库 sqlite3 即可）
+# wechat-decrypt 的依赖由 setup_check.py 自动安装：
+#   pycryptodome>=3.19,<4
+#   zstandard>=0.22,<1
