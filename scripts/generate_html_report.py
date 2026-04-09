@@ -1718,7 +1718,12 @@ def render_html(stats, analysis, contact_name):
 
 <footer class="footer">
   <p style="margin:0 0 14px;font-size:14px;line-height:1.9;color:var(--text-muted);max-width:620px;margin-left:auto;margin-right:auto;font-style:italic;opacity:.85;">
-    代码是冰冷的规则，但爱是流动的温热。任何算法都无法定义真正的双向奔赴，愿你拥有看破迷局的智慧，更有去真诚拥抱现实的勇气。答案，永远在你们彼此的心里。
+    你愿意走到这里，本身就已经说明了一切。<br>
+    能为一段感情认真复盘、鼓起勇气直视现实的人，从来不缺被爱的资格。<br>
+    算法能还原对话的节奏，却读不懂你在屏幕前的那一声心跳。<br>
+    这份报告是一面镜子——照见的是数据，照不见的，才是真正的你们。<br><br>
+    放下这份冰冷的报告，去现实里，用真心换真心。<br>
+    爱情从来不需要算法背书，它只需要你，开口。
   </p>
   仅供参考 · 数据本地处理，不上传任何服务器 · 她爱你吗？恋情分析室 · {date_str}
 </footer>
