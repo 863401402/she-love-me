@@ -20,42 +20,45 @@ metadata:
 
 ### Step 0: 环境部署
 
-运行以下检查和安装：
+先选择系统可用的 Python 解释器：
+
+- Windows 优先 `python`
+- macOS / Linux 优先 `python3`
+- 如果首选不存在，再回退到另一个
+
+运行跨平台环境检查脚本：
 
 ```bash
-# 检查 Python
-python --version
-
-# 检查 wechat-decrypt 是否已 clone
-# 如果 vendor/wechat-decrypt/ 不存在，自动 clone
+<PYTHON> scripts/setup_check.py --ensure-decryptor
 ```
 
-用 Bash 工具检查 `vendor/wechat-decrypt/` 目录是否存在，不存在则 clone：
-```bash
-git clone https://github.com/ylytdeng/wechat-decrypt vendor/wechat-decrypt
-```
+这个脚本会自动完成：
 
-安装 wechat-decrypt 的依赖：
-```bash
-pip install pycryptodome zstandard
-```
+- 检查 Python 版本
+- 检查 `vendor/wechat-decrypt/` 是否存在，不存在则自动 clone
+- 安装 `pycryptodome` 与 `zstandard`
+- 检查微信是否正在运行（Windows / macOS）
 
-检查微信是否在运行：
-```bash
-tasklist | findstr -i wechat
-```
+如果脚本返回非 0：
 
-如果微信没运行，告知用户：「请先打开微信并登录，然后重新运行 /she-love-me」，停止执行。
+- 读取 JSON 错误信息并向用户说明原因
+- 如果错误是“请先打开微信并登录”，停止执行
+- 如果是权限错误：
+  - Windows：提示用户改用管理员终端
+  - macOS：提示用户检查终端权限并按系统提示授权
 
 ### Step 1: 解密微信数据库
 
-在 `vendor/wechat-decrypt/` 目录下运行：
+运行跨平台解密入口：
 ```bash
-cd vendor/wechat-decrypt && python main.py decrypt
+<PYTHON> scripts/decrypt_wechat.py
 ```
 
 **注意**：
-- 需要管理员权限，如果报错 "权限不足" 或 "Access Denied"，告知用户需要以管理员身份重新打开终端
+- macOS 下这个入口会自动编译并调用 `vendor/wechat-decrypt/find_all_keys_macos.c`
+- Windows 如果报错 "权限不足" 或 "Access Denied"，告知用户需要以管理员身份重新打开终端
+- macOS 如果报错权限或目录访问失败，告知用户检查终端系统权限并重试
+- macOS 如果已经手动执行过 `sudo ./find_all_keys_macos` 生成 `all_keys.json`，此入口应直接复用现有密钥继续解密
 - 首次运行会自动检测微信数据目录并创建 `config.json`
 - 成功后会在 `vendor/wechat-decrypt/decrypted/` 目录生成解密后的 SQLite 文件
 
@@ -65,7 +68,7 @@ cd vendor/wechat-decrypt && python main.py decrypt
 
 运行联系人列表脚本：
 ```bash
-python scripts/list_contacts.py --decrypted-dir vendor/wechat-decrypt/decrypted
+<PYTHON> scripts/list_contacts.py --decrypted-dir vendor/wechat-decrypt/decrypted
 ```
 
 这会输出 JSON 格式的联系人列表，包含名字和消息数量。
@@ -79,7 +82,7 @@ python scripts/list_contacts.py --decrypted-dir vendor/wechat-decrypt/decrypted
 ### Step 4: 提取消息
 
 ```bash
-python scripts/extract_messages.py \
+<PYTHON> scripts/extract_messages.py \
   --decrypted-dir vendor/wechat-decrypt/decrypted \
   --contact "<用户选择的联系人名字>" \
   --output data/messages.json
@@ -88,7 +91,7 @@ python scripts/extract_messages.py \
 ### Step 5: 统计分析
 
 ```bash
-python scripts/stats_analyzer.py \
+<PYTHON> scripts/stats_analyzer.py \
   --input data/messages.json \
   --output data/stats.json
 ```
@@ -143,7 +146,7 @@ python scripts/stats_analyzer.py \
 ### Step 7: 生成报告
 
 ```bash
-python scripts/generate_html_report.py \
+<PYTHON> scripts/generate_html_report.py \
   --stats data/stats.json \
   --analysis data/analysis.json \
   --contact "<联系人名字>" \
@@ -197,7 +200,8 @@ python scripts/generate_html_report.py \
 
 ## 错误处理
 
-- **管理员权限错误**：提示用户以管理员身份重新打开终端
+- **管理员权限错误**：Windows 提示用户以管理员身份重新打开终端
+- **macOS 权限错误**：提示用户检查终端系统权限并重新运行
 - **微信未运行**：提示用户打开微信
 - **找不到联系人**：列出相似名字供用户重新选择
 - **数据库解密失败**：检查 `vendor/wechat-decrypt/config.json` 中的 `db_dir` 是否正确

@@ -95,7 +95,7 @@ def find_username(contact_query, names):
 
 
 def get_own_wxid(decrypted_dir):
-    """从 config.json 或目录结构推断自己的 wxid"""
+    """从 config.json 推断自己的 wxid，兼容 Windows / macOS 路径"""
     # 尝试从 vendor/wechat-decrypt/config.json 读取
     config_candidates = [
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -108,10 +108,15 @@ def get_own_wxid(decrypted_dir):
             try:
                 with open(cfg_path, encoding="utf-8") as f:
                     cfg = json.load(f)
+                if cfg.get("wxid"):
+                    return cfg["wxid"]
                 db_dir = cfg.get("db_dir", "")
-                if db_dir and os.path.basename(db_dir) == "db_storage":
-                    # D:\xwechat_files\<wxid>\db_storage
-                    return os.path.basename(os.path.dirname(db_dir))
+                if db_dir:
+                    parts = [p for p in os.path.normpath(db_dir).split(os.sep) if p]
+                    if "db_storage" in parts:
+                        idx = len(parts) - 1 - parts[::-1].index("db_storage")
+                        if idx > 0:
+                            return parts[idx - 1]
             except Exception:
                 pass
     return None
