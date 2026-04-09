@@ -18,6 +18,8 @@ venv/
 .vscode/
 .idea/
 *.swp
+.kiro/
+.trae/
 
 # OS
 .DS_Store
