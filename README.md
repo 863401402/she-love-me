@@ -57,7 +57,7 @@
 
 | 最终鉴定结果 |
 |:---:|
-| ![鉴定结果](assets\result.png) |
+| ![鉴定结果](assets/result.png) |
 ---
 
 ## 功能特性
