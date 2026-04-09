@@ -101,7 +101,7 @@ cd she-love-me
 | [GitHub Copilot](https://github.com/features/copilot) | `.agents/skills/` | 打开 VS Code | `/she-love-me` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `.agents/skills/` | `gemini`（管理员） | `/she-love-me` |
 
-> Skill 文件位于 `.claude/skills/she-love-me.md`（Claude Code / OpenClaw）和 `.agents/skills/she-love-me/SKILL.md`（通用格式），Agent 会自动识别。
+> Skill 文件位于 `.claude/skills/she-love-me/SKILL.md`（Claude Code / OpenClaw）和 `.agents/skills/she-love-me/SKILL.md`（通用格式），Agent 会自动识别。
 
 ### 运行
 
@@ -158,8 +158,14 @@ HTML 报告（暗色现代风格）+ Markdown 摘要
 ```
 she-love-me/
 ├── .claude/
+│   ├── settings.json           # Skill 注册配置
 │   └── skills/
-│       └── she-love-me.md      # Skill 入口（全自动流程定义）
+│       └── she-love-me/
+│           └── SKILL.md        # Skill 入口（Claude Code / OpenClaw）
+├── .agents/
+│   └── skills/
+│       └── she-love-me/
+│           └── SKILL.md        # Skill 入口（Cursor / Copilot / Gemini CLI）
 ├── scripts/
 │   ├── list_contacts.py        # 列出联系人（按消息数排序）
 │   ├── extract_messages.py     # 提取指定联系人全部消息
