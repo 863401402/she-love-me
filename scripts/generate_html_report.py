@@ -108,6 +108,7 @@ def render_gottman(gottman):
     horsemen = gottman.get("horsemen_detected", [])
     risk     = escape_html(gottman.get("risk_level", ""))
     ratio_pct = min(int(ratio / 10 * 100), 100)
+    repair   = gottman.get("repair_attempts", {})
 
     horsemen_chips = "".join(
         f'<span class="horseman-chip">{escape_html(h)}</span>' for h in horsemen
@@ -116,6 +117,24 @@ def render_gottman(gottman):
         horsemen_chips = '<span style="color:var(--text-subtle);font-size:12px;">未检测到四骑士信号</span>'
 
     risk_color = {"高危": "#ef4444", "中危": "#eab308", "低危": "#22c55e"}.get(risk, "#6b7280")
+
+    repair_html = ""
+    if repair:
+        who   = escape_html(repair.get("who_initiates", ""))
+        who_label = "你先低头" if who == "me" else ("对方先低头" if who == "them" else escape_html(who))
+        method = escape_html(repair.get("method", ""))
+        resp   = escape_html(repair.get("partner_response", ""))
+        rate   = escape_html(repair.get("success_rate", ""))
+        repair_html = f"""
+      <div class="repair-section">
+        <div class="repair-label">修复尝试分析</div>
+        <div class="repair-grid">
+          {f'<div class="repair-item"><span class="repair-key">主动低头</span><span class="repair-val">{who_label}</span></div>' if who_label else ''}
+          {f'<div class="repair-item"><span class="repair-key">修复方式</span><span class="repair-val">{method}</span></div>' if method else ''}
+          {f'<div class="repair-item"><span class="repair-key">对方响应</span><span class="repair-val">{resp}</span></div>' if resp else ''}
+          {f'<div class="repair-item"><span class="repair-key">成功率</span><span class="repair-val">{rate}</span></div>' if rate else ''}
+        </div>
+      </div>"""
 
     return f"""
     <div class="gottman-wrap">
@@ -129,6 +148,7 @@ def render_gottman(gottman):
       <div class="gottman-bar-track"><div class="gottman-bar-fill" style="width:{ratio_pct}%;background:{risk_color};"></div></div>
       <div class="gottman-horsemen-label">四骑士检测</div>
       <div class="gottman-horsemen">{horsemen_chips}</div>
+      {repair_html}
     </div>"""
 
 
@@ -144,9 +164,42 @@ def render_personality(personality, contact_name):
 
     pursue_html = ""
     if pursue_dist:
-        pursue_html = """
+        loop = personality.get("pursue_distance_loop", {})
+        loop_html = ""
+        if loop:
+            trigger = escape_html(loop.get("trigger", ""))
+            retreat = escape_html(loop.get("retreat", ""))
+            escalation = escape_html(loop.get("escalation", ""))
+            deterioration = escape_html(loop.get("deterioration", ""))
+            loop_html = f"""
+        <div class="loop-steps">
+          {f'<div class="loop-step"><span class="loop-num">1</span><span class="loop-text">触发：{trigger}</span></div>' if trigger else ''}
+          {f'<div class="loop-step"><span class="loop-num">2</span><span class="loop-text">撤退：{retreat}</span></div>' if retreat else ''}
+          {f'<div class="loop-step"><span class="loop-num">3</span><span class="loop-text">升级：{escalation}</span></div>' if escalation else ''}
+          {f'<div class="loop-step"><span class="loop-num">4</span><span class="loop-text">恶化：{deterioration}</span></div>' if deterioration else ''}
+        </div>"""
+        pursue_html = f"""
       <div class="pursue-alert">
         ⚠️ <strong>追逃循环已形成</strong>：你越追，TA越逃；TA越逃，你越焦虑——负向循环持续强化。
+        {loop_html}
+      </div>"""
+
+    # 情感可得性
+    ea = personality.get("emotional_availability", {})
+    ea_html = ""
+    if ea:
+        ea_level = ea.get("level", "")
+        ea_evidence = escape_html(ea.get("evidence", ""))
+        ea_risk = escape_html(ea.get("risk_note", ""))
+        ea_color = {"高": "#22c55e", "中": "#eab308", "低": "#ef4444"}.get(ea_level, "#6b7280")
+        ea_html = f"""
+      <div class="ea-card">
+        <div class="ea-header">
+          <span class="ea-label">情感可得性评估</span>
+          <span class="ea-badge" style="color:{ea_color};border-color:{ea_color}33;background:{ea_color}11;">{ea_level}</span>
+        </div>
+        {f'<p class="ea-evidence">{ea_evidence}</p>' if ea_evidence else ''}
+        {f'<p class="ea-risk">{ea_risk}</p>' if ea_risk else ''}
       </div>"""
 
     lang_mismatch_html = ""
@@ -180,6 +233,7 @@ def render_personality(personality, contact_name):
       </div>
     </div>
     {pursue_html}
+    {ea_html}
     {lang_mismatch_html}"""
 
 
@@ -188,6 +242,7 @@ def render_strategist(strategist):
     stops   = strategist.get("stop_doing", [])
     starts  = strategist.get("start_doing", [])
     roadmap = escape_html(strategist.get("roadmap", ""))
+    walkaway = strategist.get("walkaway_point", {})
 
     def render_stop_item(s):
         if isinstance(s, dict):
@@ -205,9 +260,12 @@ def render_strategist(strategist):
     def render_start_item(s):
         if isinstance(s, dict):
             action = escape_html(s.get("action", ""))
+            timing = escape_html(s.get("timing", ""))
             reason = escape_html(s.get("reason", ""))
             script = escape_html(s.get("script", ""))
             html   = f'<li class="strategy-start-item">✅ {action}'
+            if timing:
+                html += f'<div class="strategy-timing">⏰ 时机：{timing}</div>'
             if reason:
                 html += f'<div class="strategy-reason">{reason}</div>'
             if script:
@@ -217,6 +275,18 @@ def render_strategist(strategist):
 
     stops_html  = "\n".join(render_stop_item(s) for s in stops)
     starts_html = "\n".join(render_start_item(s) for s in starts)
+
+    walkaway_html = ""
+    if walkaway:
+        wa_tf      = escape_html(walkaway.get("timeframe", ""))
+        wa_trigger = escape_html(walkaway.get("trigger", ""))
+        wa_reason  = escape_html(walkaway.get("reason", ""))
+        walkaway_html = f"""
+      <div class="walkaway-card">
+        <div class="walkaway-label">🚩 止损红线（Walk-away Point）</div>
+        {f'<p class="walkaway-trigger">如果在 <strong>{wa_tf}</strong> 内，对方仍然出现：{wa_trigger}</p>' if wa_trigger else ''}
+        {f'<p class="walkaway-reason">{wa_reason}</p>' if wa_reason else ''}
+      </div>"""
 
     return f"""
     <div class="strategist-wrap">
@@ -238,6 +308,7 @@ def render_strategist(strategist):
         <div class="roadmap-label">推进路线图</div>
         <p class="roadmap-text">{roadmap}</p>
       </div>
+      {walkaway_html}
     </div>"""
 
 
@@ -312,12 +383,27 @@ def render_emotional_asymmetry(asym):
     anchor      = asym.get("anchor_person", "me")
     anchor_desc = escape_html(asym.get("anchor_description", ""))
     conflict    = escape_html(asym.get("conflict_pattern", ""))
+    power_dyn   = escape_html(asym.get("power_dynamics", ""))
+    turning     = asym.get("key_turning_point", {})
 
     score_pct = int(score / 10 * 100)
     anchor_label = "你" if anchor == "me" else "对方"
     float_label  = "对方" if anchor == "me" else "你"
 
     score_color = "#a855f7" if score >= 7 else ("#eab308" if score >= 4 else "#ef4444")
+
+    turning_html = ""
+    if turning and turning.get("date"):
+        t_date  = escape_html(turning.get("date", ""))
+        t_event = escape_html(turning.get("event", ""))
+        turning_html = f"""
+      <div class="asym-turning">
+        <span class="asym-turning-label">⚡ 关键转折点</span>
+        <span class="asym-turning-date">{t_date}</span>
+        <p class="asym-turning-event">{t_event}</p>
+      </div>"""
+
+    power_html = f'<div class="asym-power"><span class="asym-power-label">权力动态</span> {power_dyn}</div>' if power_dyn else ""
 
     return f"""
     <div class="asym-wrap">
@@ -334,6 +420,8 @@ def render_emotional_asymmetry(asym):
       <div class="asym-bar-track"><div class="asym-bar-fill" style="width:{score_pct}%;background:{score_color};"></div></div>
       {f'<p class="asym-anchor-desc">{anchor_desc}</p>' if anchor_desc else ''}
       {f'<div class="asym-conflict"><span class="asym-conflict-label">冲突模式</span> {conflict}</div>' if conflict else ''}
+      {power_html}
+      {turning_html}
     </div>"""
 
 
@@ -1308,6 +1396,12 @@ def render_html(stats, analysis, contact_name):
 
   /* ── Strategy Quote/Script ── */
   .strategy-reason {{ font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }}
+  .strategy-timing {{
+    font-size: 11px;
+    color: #a855f7;
+    margin-top: 4px;
+    font-weight: 500;
+  }}
   .strategy-quote {{
     font-size: 11px;
     font-style: italic;
@@ -1324,13 +1418,60 @@ def render_html(stats, analysis, contact_name):
     border-left: 2px solid rgba(34,197,94,.4);
     margin-top: 6px;
   }}
+
+  /* ── Walk-away Point ── */
+  .walkaway-card {{
+    background: rgba(239,68,68,.06);
+    border: 1px solid rgba(239,68,68,.2);
+    border-left: 3px solid #ef4444;
+    border-radius: var(--radius-sm);
+    padding: 18px 20px;
+  }}
+  .walkaway-label {{ font-size: 12px; font-weight: 700; color: #ef4444; letter-spacing: .06em; margin-bottom: 10px; }}
+  .walkaway-trigger {{ font-size: 13px; color: var(--text-muted); line-height: 1.7; margin-bottom: 6px; }}
+  .walkaway-reason {{ font-size: 12px; color: #6b7280; line-height: 1.6; }}
+
+  /* ── Repair Attempts ── */
+  .repair-section {{ margin-top: 14px; }}
+  .repair-label {{ font-size: 11px; font-weight: 600; color: var(--text-subtle); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }}
+  .repair-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }}
+  .repair-item {{ background: var(--surface-2); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }}
+  .repair-key {{ font-size: 10px; color: var(--text-subtle); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }}
+  .repair-val {{ font-size: 12px; color: var(--text-muted); line-height: 1.5; }}
+
+  /* ── Emotional Availability ── */
+  .ea-card {{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    margin-top: 12px;
+  }}
+  .ea-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
+  .ea-label {{ font-size: 12px; font-weight: 700; color: var(--text-muted); }}
+  .ea-badge {{ font-size: 11px; font-weight: 700; border: 1px solid; border-radius: 99px; padding: 3px 10px; letter-spacing: .05em; }}
+  .ea-evidence {{ font-size: 13px; color: var(--text-muted); line-height: 1.7; margin-bottom: 6px; }}
+  .ea-risk {{ font-size: 12px; color: #6b7280; line-height: 1.6; }}
+
+  /* ── Pursue-Distance Loop Steps ── */
+  .loop-steps {{ margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }}
+  .loop-step {{ display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }}
+  .loop-num {{ min-width: 20px; height: 20px; border-radius: 50%; background: rgba(249,115,22,.2); color: #f97316; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
+
+  /* ── Asymmetry Power/Turning ── */
+  .asym-power {{ font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }}
+  .asym-power-label {{ color: #3b82f6; font-weight: 600; margin-right: 6px; }}
+  .asym-turning {{ margin-top: 12px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px 14px; }}
+  .asym-turning-label {{ font-size: 11px; font-weight: 600; color: #eab308; letter-spacing: .06em; }}
+  .asym-turning-date {{ font-size: 11px; color: var(--text-subtle); margin-left: 8px; }}
+  .asym-turning-event {{ font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }}
 </style>
 </head>
 <body>
 
 <!-- Hero -->
 <header class="hero">
-  <p class="hero-eyebrow">舔狗鉴定所 · 聊天记录分析报告</p>
+  <p class="hero-eyebrow">她爱你吗？· 恋爱关系深度分析</p>
   <h1 class="hero-title">她爱你吗？</h1>
   <p class="hero-contact">与 <span>{escape_html(contact_name)}</span> 的聊天记录</p>
   <p class="hero-date">{date_range[0]} — {date_range[1]} · {total_days} 天 · {basic.get('total_messages', 0):,} 条消息</p>
@@ -1344,7 +1485,7 @@ def render_html(stats, analysis, contact_name):
     <div class="score-grid">
       <div class="score-card simp">
         <div class="score-emoji">🐶</div>
-        <div class="score-label">舔狗指数</div>
+        <div class="score-label">主动指数</div>
         <div class="score-value">{simp}</div>
         <div class="score-bar"><div class="score-bar-fill" style="width:{simp}%"></div></div>
         {f'<div class="score-desc">{simp_description}</div>' if simp_description else ''}
@@ -1370,7 +1511,7 @@ def render_html(stats, analysis, contact_name):
     <p class="section-label">恋爱成分表</p>
     <div class="ingredient-list">
       <div class="ingredient-row">
-        <span class="ingredient-name">🐶 舔犬成分</span>
+        <span class="ingredient-name">🔥 主动投入</span>
         <div class="ingredient-track"><div class="ingredient-fill i-simp" style="width:{simp}%"></div></div>
         <span class="ingredient-pct">{simp}%</span>
       </div>
@@ -1563,7 +1704,7 @@ def render_html(stats, analysis, contact_name):
     <p class="section-label">最终鉴定</p>
     <div class="verdict-card">
       <div class="verdict-meta-row">
-        <span class="verdict-type-badge">舔狗鉴定所 · 官方认证</span>
+        <span class="verdict-type-badge">恋爱关系鉴定 · 深度报告</span>
         {f'<span class="verdict-trend-badge">{trend_icon} {relationship_trend}</span>' if relationship_trend else ''}
       </div>
       <div class="verdict-type">{relationship_type}</div>
@@ -1576,7 +1717,7 @@ def render_html(stats, analysis, contact_name):
 </main>
 
 <footer class="footer">
-  仅供娱乐 · 数据本地处理，不上传任何服务器 · 她爱你吗？舔狗鉴定所 · {date_str}
+  仅供参考 · 数据本地处理，不上传任何服务器 · 她爱你吗？恋爱关系分析 · {date_str}
 </footer>
 
 <script>

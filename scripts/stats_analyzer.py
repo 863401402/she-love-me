@@ -285,7 +285,7 @@ def analyze_linguistics(text_messages, all_messages):
 
 
 def compute_scores(stats):
-    """计算舔狗指数、被爱指数、冷淡指数（0-100）"""
+    """计算主动指数、被爱指数、冷淡指数（0-100）"""
     basic = stats["basic"]
     initiative = stats["initiative"]
     reply = stats["reply_speed"]
@@ -298,7 +298,7 @@ def compute_scores(stats):
     my_total = basic["my_messages"]
     their_total = basic["their_messages"]
 
-    # === 舔狗指数 ===
+    # === 主动指数 ===
     simp_score = 0.0
 
     # 消息占比（你发超过60%加分）
@@ -513,8 +513,21 @@ def main():
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
 
+    # 导出纯文本完整对话记录，供大模型进行全量分析
+    chat_history_path = os.path.join(os.path.dirname(os.path.abspath(args.output)), "chat_history.txt")
+    try:
+        with open(chat_history_path, "w", encoding="utf-8") as f:
+            for m in text_msgs:
+                sender_name = "Me" if m["sender"] == "me" else contact_display
+                dt = datetime.fromtimestamp(m["timestamp"]).strftime("%Y-%m-%d %H:%M")
+                content = m["content"].replace("\n", "  ")
+                f.write(f"[{dt}] {sender_name}: {content}\n")
+        print(f"[+] 已导出全量纯文本聊天记录至: {chat_history_path}", file=sys.stderr)
+    except Exception as e:
+        print(f"[!] 导出全量聊天记录失败: {e}", file=sys.stderr)
+
     s = stats["scores"]
-    print(f"[+] 分析完成: 舔狗={s['simp_index']} 被爱={s['loved_index']} 冷淡={s['cold_index']}", file=sys.stderr)
+    print(f"[+] 分析完成: 主动={s['simp_index']} 被爱={s['loved_index']} 冷淡={s['cold_index']}", file=sys.stderr)
     print(json.dumps({"status": "ok", "scores": stats["scores"]}))
 
 

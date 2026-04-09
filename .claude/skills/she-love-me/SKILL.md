@@ -487,7 +487,12 @@ metadata:
     "symmetry_score": 4,
     "anchor_person": "me",
     "anchor_description": "用户明显是关系中投入更多的那个，对方处于观望和评估状态",
-    "conflict_pattern": "用户在冲突中倾向于追，对方倾向于沉默或撤退，形成明显的追逃循环"
+    "conflict_pattern": "用户在冲突中倾向于追，对方倾向于沉默或撤退，形成明显的追逃循环",
+    "power_dynamics": "话题发起：你 XX 次 vs 对方 XX 次；话题终结：你 XX 次 vs 对方 XX 次 → 对方掌控对话节奏，符合最小兴趣原则",
+    "key_turning_point": {
+      "date": "YYYY-MM-DD",
+      "event": "那次关于XX的争吵后，对方回复速度断崖式下降，从分钟级变为天级"
+    }
   },
 
   "personality_portrait": {
@@ -577,13 +582,30 @@ metadata:
   "gottman": {
     "positive_negative_ratio": 2.3,
     "horsemen_detected": ["蔑视", "冷战/筑墙"],
-    "risk_level": "高危"
+    "risk_level": "高危",
+    "repair_attempts": {
+      "who_initiates": "me",
+      "method": "发表情包/转移话题",
+      "partner_response": "继续冷漠，拒绝接受修复",
+      "success_rate": "约 2/5 次成功，修复弹性较低"
+    }
   },
 
   "personality": {
     "user_attachment": "焦虑型（Anxious-Preoccupied）",
     "partner_attachment": "恐惧型（Fearful-Avoidant）",
     "pursue_distance_cycle": true,
+    "pursue_distance_loop": {
+      "trigger": "我说了「你今天好像有点冷漠」，触发了TA的被吞噬恐惧",
+      "retreat": "TA停止回复，消失了两天",
+      "escalation": "我连发5条消息追问「你怎么了」",
+      "deterioration": "此次循环后，TA的平均回复时间从2小时增至1天"
+    },
+    "emotional_availability": {
+      "level": "低",
+      "evidence": "对方在我倾诉脆弱时总是回「嗯」或给建议，从未深入共情",
+      "risk_note": "对方当前情感通道基本关闭，继续高强度投入只会换来失望"
+    },
     "user_communication": "情绪型 + 迎合型",
     "partner_communication": "事务型 + 防御性开放型",
     "user_love_language": "肯定的言辞",
@@ -611,11 +633,17 @@ metadata:
     "start_doing": [
       {
         "action": "回复后留白，给对方来找你的空间",
+        "timing": "在对方下次主动找你之后，或断联满5天后",
         "reason": "恐惧型需要感到「是我在选择亲近」，而不是「我被追着跑」",
         "script": "分享一件有趣的事然后结尾，不问问题，让对方有话想说时自然来找你"
       }
     ],
-    "roadmap": "未来两周：减少主动联系频率，观察对方是否主动。如果TA主动，说明有空间；如果依然沉默，需要认真考虑这段关系的实际价值。"
+    "roadmap": "未来两周：减少主动联系频率，观察对方是否主动。如果TA主动，说明有空间；如果依然沉默，需要认真考虑这段关系的实际价值。",
+    "walkaway_point": {
+      "timeframe": "2周",
+      "trigger": "对方再次出现超过3天已读不回，或在执行策略后依然无任何主动联系",
+      "reason": "此时继续投入的成本已超出任何可能的回报，继续只会加深创伤绑定"
+    }
   },
 
   "key_findings": [
