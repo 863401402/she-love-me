@@ -10,6 +10,7 @@
 [![QQ](https://img.shields.io/badge/QQ-NapCat%20%2B%20QCE-12b7f5.svg?style=flat-square)](https://github.com/shuakami/qq-chat-exporter)
 [![Agent Skill](https://img.shields.io/badge/Universal-Agent%20Skill-d97706.svg?style=flat-square)](https://github.com/863401402/she-love-me)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-✓-d97706.svg?style=flat-square)](https://claude.ai/code)
+[![Codex](https://img.shields.io/badge/Codex-✓-111111.svg?style=flat-square)](https://developers.openai.com/codex/overview)
 [![Cursor](https://img.shields.io/badge/Cursor-✓-000000.svg?style=flat-square)](https://cursor.sh)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/863401402/she-love-me/pulls)
 
@@ -21,9 +22,9 @@
 
 ## 简介
 
-**她爱你吗？** 是一个**通用 Agent Skill**，支持 Claude Code、Cursor、GitHub Copilot、Gemini CLI 等主流 AI 编程工具。
+**她爱你吗？** 是一个**通用 Agent Skill**，支持 Claude Code、Codex、Cursor、GitHub Copilot、Gemini CLI 等主流 AI 编程工具。
 
-只需要一条命令 `/she-love-me`，它就能自动解密你的微信数据库（或通过 QCE 提取 QQ 记录）、分析你和某个联系人的全部聊天记录，然后告诉你：**这段关系里，谁更在意？她真的爱你吗？**
+只需要一句调用指令（例如 Claude 里输入 `/she-love-me`，Codex 里输入 `$she-love-me`），它就能自动解密你的微信数据库（或通过 QCE 提取 QQ 记录）、分析你和某个联系人的全部聊天记录，然后告诉你：**这段关系里，谁更在意？她真的爱你吗？**
 
 v2.0 起融入专业心理学框架，不只给结论——还做**依恋类型诊断**、**Gottman 关系健康检测**、**危险信号预警**，并以军师身份给出具体可执行的建议。
 
@@ -76,7 +77,7 @@ v2.2 起支持 **QQ 聊天记录分析**（通过 [QQ Chat Exporter](https://git
 | 💡 **情感可得性评估** | 对方此刻是否真的有能力投入这段关系 |
 | ⚠️ **危险预警** | 煤气灯效应 · 爱情轰炸 · 间歇性强化 · 单相思痴迷等 7 类信号 |
 | 🎯 **军师模式** | 核心诊断 + 停止/开始建议（含时机）+ 路线图 + **止损红线** |
-| 🔍 **AI 深度鉴定** | Claude 读取全量消息，结合统计数据给出有洞察力的结论 |
+| 🔍 **AI 深度鉴定** | Agent 读取全量消息，结合统计数据给出有洞察力的结论 |
 | 📄 **双格式输出** | 终端 Markdown 摘要 + 可分享的 HTML 报告 |
 
 ---
@@ -96,7 +97,7 @@ v2.2 起支持 **QQ 聊天记录分析**（通过 [QQ Chat Exporter](https://git
 - 无需管理员权限，无需解密步骤
 
 **通用**：
-- 任意一个支持 Skill 的 AI 编程工具（见下方）
+- 任意一个支持 Skill 或 `AGENTS.md` 的 AI 编程工具（见下方）
 
 ### 安装
 
@@ -107,27 +108,38 @@ cd she-love-me
 
 根据你使用的 AI 工具，启动对应的 Agent：
 
-| 工具 | Skill 格式 | 启动命令 | 运行命令 |
+| 工具 | Skill 格式 | 启动方式 | 调用方式 |
 |------|-----------|----------|----------|
 | [Claude Code](https://claude.ai/code) | `.claude/skills/` | `claude` | `/she-love-me` |
 | [OpenClaw](https://openclaw.ai) | `.claude/skills/` | `openclaw`（管理员） | `/she-love-me` |
+| [Codex](https://developers.openai.com/codex/overview) | `.agents/skills/` + `AGENTS.md` | 打开项目，或在仓库根目录运行 `codex` | `$she-love-me`，或直接说“使用 she-love-me 分析聊天记录” |
 | [Cursor](https://cursor.sh) | `.agents/skills/` | 打开项目文件夹 | `/she-love-me` |
 | [GitHub Copilot](https://github.com/features/copilot) | `.agents/skills/` | 打开 VS Code | `/she-love-me` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `.agents/skills/` | `gemini` | `/she-love-me` |
 
-> Skill 文件位于 `.claude/skills/she-love-me/SKILL.md`（Claude Code / OpenClaw）和 `.agents/skills/she-love-me/SKILL.md`（通用格式），Agent 会自动识别。
+> Skill 文件位于 `.claude/skills/she-love-me/SKILL.md`（Claude Code / OpenClaw）和 `.agents/skills/she-love-me/SKILL.md`（Codex / Cursor / Copilot / Gemini CLI）。Codex 还会读取仓库根目录的 `AGENTS.md`，并识别 `.agents/skills/she-love-me/agents/openai.yaml` 中的元数据。
 
 ### 运行
 
-```
+Claude Code / OpenClaw / Cursor / Copilot / Gemini CLI：
+
+```text
 /she-love-me
 ```
+
+Codex：
+
+```text
+$she-love-me
+```
+
+也可以直接说一句自然语言，例如：`使用 she-love-me 分析微信聊天记录`。
 
 **就这些。** Skill 会先询问平台（微信 / QQ），然后自动处理一切：
 
 **微信流程：**
 ```
-/she-love-me
+调用 she-love-me Skill
   ↓
 运行 setup_check.py → 自动 clone wechat-decrypt → pip install 依赖
   ↓
@@ -135,7 +147,7 @@ cd she-love-me
   ↓
 展示联系人列表 → 你选择分析对象
   ↓
-提取消息 → 统计计算 → Claude AI 深度鉴定
+提取消息 → 统计计算 → AI 深度鉴定
   ↓
 关系诊断 · 依恋类型 · 危险预警 · 军师建议
   ↓
@@ -144,13 +156,13 @@ cd she-love-me
 
 **QQ 流程（v2.2）：**
 ```
-/she-love-me
+调用 she-love-me Skill
   ↓
 输入 QCE Access Token（需提前启动 NapCat + QCE）
   ↓
 通过 API 获取 QQ 好友列表 → 你选择分析对象
   ↓
-提取消息 → 统计计算 → Claude AI 深度鉴定
+提取消息 → 统计计算 → AI 深度鉴定
   ↓
 关系诊断 · 依恋类型 · 危险预警 · 军师建议
   ↓
@@ -177,8 +189,8 @@ wechat-decrypt（自动 clone）
     ▼
 主动指数 / 被爱指数 / 成分表 / 趋势数据
     │
-    │  Claude AI：Sternberg 三角 · Gottman 四骑士 · 依恋类型
-    │             权力动态 · 情感可得性 · 危险预警 · 军师建议
+    │  AI Agent：Sternberg 三角 · Gottman 四骑士 · 依恋类型
+    │            权力动态 · 情感可得性 · 危险预警 · 军师建议
     ▼
 HTML 报告（暗色现代风格）+ Markdown 摘要
 ```
@@ -195,7 +207,7 @@ scripts/extract_messages_qq.py（API 调用 + 格式转换）
     ▼
 scripts/ 统计分析引擎（与微信共用）
     │
-    │  Claude AI 深度鉴定
+    │  AI Agent 深度鉴定
     ▼
 HTML 报告 + Markdown 摘要
 ```
@@ -208,6 +220,7 @@ HTML 报告 + Markdown 摘要
 
 ```
 she-love-me/
+├── AGENTS.md                  # Codex 仓库级说明与调用约定
 ├── .claude/
 │   ├── settings.json           # Skill 注册配置
 │   └── skills/
@@ -216,7 +229,9 @@ she-love-me/
 ├── .agents/
 │   └── skills/
 │       └── she-love-me/
-│           └── SKILL.md        # Skill 入口（Cursor / Copilot / Gemini CLI）
+│           ├── SKILL.md        # Skill 入口（Codex / Cursor / Copilot / Gemini CLI）
+│           └── agents/
+│               └── openai.yaml # Codex 元数据（显示名 / 默认提示 / 品牌色）
 ├── scripts/
 │   ├── setup_check.py          # 跨平台环境检查 / 依赖准备 / 微信进程检测
 │   ├── decrypt_wechat.py       # 跨平台解密入口（macOS 走 C 扫描器）
