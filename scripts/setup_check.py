@@ -20,6 +20,12 @@ DEFAULT_DECRYPTOR_DIR = REPO_ROOT / "vendor" / "wechat-decrypt"
 DECRYPTOR_REPO = "https://github.com/ylytdeng/wechat-decrypt"
 DEPENDENCIES = ("pycryptodome", "zstandard")
 SUPPORTED_PLATFORMS = {"win32": "Windows", "darwin": "macOS"}
+RUNTIME_DIRS = (
+    REPO_ROOT / "vendor",
+    REPO_ROOT / "data",
+    REPO_ROOT / "reports",
+    REPO_ROOT / "scripts" / "tmp",
+)
 
 
 def run_command(cmd, cwd=None):
@@ -54,6 +60,15 @@ def build_notes():
     return [
         "当前仓库仅正式支持 Windows 和 macOS。",
     ]
+
+
+def ensure_runtime_dirs():
+    created = []
+    for directory in RUNTIME_DIRS:
+        if not directory.exists():
+            directory.mkdir(parents=True, exist_ok=True)
+            created.append(str(directory))
+    return created
 
 
 def ensure_decryptor(decryptor_dir):
@@ -130,6 +145,14 @@ def main():
         "notes": build_notes(),
         "actions": [],
     }
+
+    created_dirs = ensure_runtime_dirs()
+    if created_dirs:
+        report["actions"].append({
+            "changed": True,
+            "message": "已初始化运行目录",
+            "directories": created_dirs,
+        })
 
     if sys.platform not in SUPPORTED_PLATFORMS:
         report["status"] = "error"
