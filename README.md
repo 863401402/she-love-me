@@ -82,10 +82,11 @@
 | 💘 **Sternberg 三角** | 激情 · 亲密 · 承诺三维评分，判断爱情类型 |
 | 🩹 **修复尝试分析** | 冷战后谁低头？对方接受还是继续惩罚？ |
 | 💡 **情感可得性评估** | 对方此刻是否真的有能力投入这段关系 |
-| ⚠️ **危险预警** | 煤气灯效应 · 爱情轰炸 · 间歇性强化 · 单相思痴迷等 7 类信号 |
+| ⚠️ **危险预警** | 7 类信号（煤气灯 · 爱情轰炸 · 间歇性强化 · 单相思痴迷等）· **双阈值触发**（量化+文本同时满足才高亮，否则降级为观察提示） |
 | 🎯 **军师模式** | 核心诊断 + 停止/开始建议（含时机）+ 路线图 + **止损红线** |
 | 👴 **祖师爷寄语** | 童锦程视角 · 读局 + 推进关系三条实招 + 关系地位指南 + 金句收尾 |
-| 🔍 **AI 深度鉴定** | Agent 读取全量消息，结合统计数据给出有洞察力的结论 |
+| 🔍 **AI 深度鉴定** | 全量统计层（stats.json）+ 用户选定范围分层采样，三层架构避免"全量幻觉"，评分有推导来源不靠模型主观拍板 |
+| 🎯 **动态采样选择** | 自动推荐分析时间范围（1个月/3个月/半年/全量），展示每个选项的消息条数，由用户决定分析窗口 |
 | 📄 **双格式输出** | 终端 Markdown 摘要 + 可分享的 HTML 报告 |
 
 ---
@@ -129,13 +130,15 @@ WeChat（运行中）/ NapCat + QCE（QQ）
     ▼
 标准 SQLite / JSON 消息数据
     │
-    │  scripts/ 统计分析引擎
-    ▼
-主动指数 / 被爱指数 / 成分表 / 趋势数据
+    ├─► stats_analyzer.py → stats.json（全量统计：主动性/回复速度/语言学特征）
     │
-    │  AI Agent 深度分析
-    │  Sternberg 三角 · Gottman 四骑士 · 依恋类型
-    │  权力动态 · 危险预警 · 军师建议 · 👴 祖师爷寄语
+    ├─► build_chat_history.py（用户动态选择分析范围）
+    │       → chat_history.txt（分层采样：起源窗口 / 高冲突区间 / 近30天 / 修复时刻）
+    ▼
+AI Agent 深度分析（全量统计 + 分层采样关键窗口）
+    │  Sternberg 三角（信号计数推导）· Gottman 正负比（词典+文本校正）
+    │  对称性评分（stats.json 字段加权）· 双阈值危险预警
+    │  依恋类型 · 核心恐惧 · 防御机制 · 军师建议 · 👴 祖师爷寄语
     ▼
 HTML 报告（暗色现代风格）+ Markdown 摘要
 ```
@@ -148,16 +151,24 @@ HTML 报告（暗色现代风格）+ Markdown 摘要
 
 ```
 she-love-me/
-├── .claude/skills/she-love-me/SKILL.md        # Skill 入口（Claude Code / OpenClaw）
-├── .agents/skills/she-love-me/SKILL.md        # Skill 入口（Codex / Cursor / Copilot / Gemini CLI）
-├── .agents/skills/she-love-me/agents/openai.yaml
+├── .agents/skills/she-love-me/
+│   ├── SKILL.md                               # 唯一 Skill 入口（所有工具共用）
+│   ├── agents/openai.yaml
+│   └── references/                            # 知识库（SKILL.md 按需读取）
+│       ├── analysis-framework.md              # 心理学分析框架（模块 F / A / B）
+│       ├── risk-signals.md                    # 危险预警 7 类信号 + 双阈值触发规则
+│       ├── strategist-guide.md                # 军师 / 童锦程寄语 / 语气风格
+│       ├── report-schema.md                   # analysis.json 结构 + 评分推导规则
+│       └── report-template.md                 # Step 9 Markdown 展示模板
+├── .claude/settings.json                      # Claude Code Skill 路径注册
 ├── references/tong-jincheng/                  # 祖师爷心智模型参考材料
 ├── scripts/
 │   ├── setup_check.py                         # 环境检查 / 依赖准备
 │   ├── decrypt_wechat.py                      # 微信解密入口
 │   ├── list_contacts.py / list_contacts_qq.py
 │   ├── extract_messages.py / extract_messages_qq.py
-│   ├── stats_analyzer.py                      # 统计分析引擎（微信/QQ 共用）
+│   ├── stats_analyzer.py                      # 全量统计分析引擎
+│   ├── build_chat_history.py                  # 分层采样：动态范围选择 + 关键窗口提取
 │   └── generate_html_report.py                # HTML 报告生成（微信/QQ 共用）
 ├── vendor/                                    # wechat-decrypt（gitignore）
 ├── data/                                      # 分析中间数据（gitignore）
@@ -183,8 +194,9 @@ she-love-me/
 - **v2.1**：核心恐惧分析 · 情感可得性评估 · 权力动态量化 · 修复尝试分析 · 追逃循环复盘 · 止损红线
 - **v2.2**：**QQ 聊天记录支持**（通过 QQ Chat Exporter API）· 微信/QQ 统一分析管线
 - **v2.3**：👴 **祖师爷寄语**（童锦程视角）· 推进关系三条实招 · 关系地位指南
-- **v3.0**（当前）：🔄 **品牌重构**「她不一样」· 叙事框架升级 · 分析模块微调 · HTML 报告开源地址
-- **v3.1**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
+- **v3.0**：🔄 **品牌重构**「她不一样」· 叙事框架升级 · 分析模块微调 · HTML 报告开源地址
+- **v3.1**（当前）：🏗️ **架构重构** · SKILL.md 控制平面拆分（980 行 → 228 行）· 双入口合一 · 分层采样引擎（`build_chat_history.py`）· 动态范围选择 · 评分推导规则（对称性/Sternberg/Gottman 均有字段来源）· 双阈值危险预警 · 可空字段设计
+- **v3.2**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
 
 ---
 
