@@ -1,6 +1,6 @@
 <div align=”center”>
 
-<img src=”assets/banner.svg” alt=”她爱我吗？恋情分析室” width=”860” />
+<img src=”https://raw.githubusercontent.com/863401402/she-love-me/main/assets/banner.svg” alt=”她爱我吗？恋情分析室” width=”860” />
 
 <br/>
 
@@ -353,7 +353,7 @@ v2.3 祖师爷寄语的心智模型与一手语录来自：
 
 <div align=”center”>
 
-<img src=”assets/jiaoliuqun.jpg” width=”220” alt=”微信交流群” />
+<img src=”https://raw.githubusercontent.com/863401402/she-love-me/main/assets/jiaoliuqun.jpg” width=”220” alt=”微信交流群” />
 
 *扫码加入微信交流群，遇到问题、分享鉴定结果、更新优化方向都可以聊*
 
