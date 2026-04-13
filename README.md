@@ -38,8 +38,6 @@
 
 *扫码加入微信交流群，遇到问题、分享鉴定结果、更新优化方向都可以聊*
 
-本项目在 [LINUX DO](https://linux.do) 社区发布与交流，感谢佬友们的支持与反馈。
-
 </div>
 
 ---
@@ -187,6 +185,20 @@ she-love-me/
 - **v2.3**：👴 **祖师爷寄语**（童锦程视角）· 推进关系三条实招 · 关系地位指南
 - **v3.0**（当前）：🔄 **品牌重构**「她不一样」· 叙事框架升级 · 分析模块微调 · HTML 报告开源地址
 - **v3.1**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
+
+---
+
+## 社区支持
+
+<div align="center">
+
+**学 AI，上 L 站**
+
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-社区支持-blue?style=for-the-badge)](https://linux.do)
+
+本项目在 [LINUX DO](https://linux.do) 社区发布与交流，感谢佬友们的支持与反馈。
+
+</div>
 
 ---
 
