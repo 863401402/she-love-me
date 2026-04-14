@@ -133,6 +133,7 @@ def extract_messages_from_db(db_path, table_name, id_to_username, own_wxid, cont
                 f"FROM [{table_name}] ORDER BY create_time ASC"
             ).fetchall()
 
+            last_known_sender = None  # 用于 revoke 消息回溯
             for row in rows:
                 local_id, local_type, create_time, real_sender_id, content, ct = row
                 content = decompress_content(content, ct)
@@ -144,11 +145,16 @@ def extract_messages_from_db(db_path, table_name, id_to_username, own_wxid, cont
                     sender = "me"
                 elif sender_username == contact_username:
                     sender = "them"
+                elif msg_type == "revoke" and last_known_sender:
+                    # revoke 消息 real_sender_id 通常为 0，回溯上一条消息的 sender
+                    sender = last_known_sender
                 elif own_wxid and not sender_username:
-                    # 无法确定，根据 real_sender_id 猜测
                     sender = "unknown"
                 else:
                     sender = "them" if sender_username == contact_username else "me"
+
+                if sender in ("me", "them"):
+                    last_known_sender = sender
 
                 # 处理内容
                 display_content = content or ""

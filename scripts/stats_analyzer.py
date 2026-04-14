@@ -509,22 +509,79 @@ def main():
 
     stats["scores"] = compute_scores(stats)
 
+    # 修复发起统计（>24h 沉默后谁先说话）
+    repair_gap = 24 * 3600
+    me_repair = 0
+    them_repair = 0
+    prev_ts = valid[0]["timestamp"] if valid else 0
+    prev_sender = None
+    for m in valid:
+        gap = m["timestamp"] - prev_ts
+        if gap >= repair_gap and prev_sender is not None:
+            if m["sender"] == "me":
+                me_repair += 1
+            elif m["sender"] == "them":
+                them_repair += 1
+        prev_ts = m["timestamp"]
+        prev_sender = m["sender"]
+    stats["repair"] = {
+        "me_repair_count": me_repair,
+        "them_repair_count": them_repair,
+    }
+
+    # 近 30 天子统计（供 C3/C6 双阈值验证）
+    last_ts = max(timestamps) if timestamps else 0
+    cutoff_30d = last_ts - 30 * 86400
+    valid_30d = [m for m in valid if m["timestamp"] >= cutoff_30d]
+    if valid_30d:
+        me_30d = sum(1 for m in valid_30d if m["sender"] == "me")
+        them_30d = sum(1 for m in valid_30d if m["sender"] == "them")
+        total_30d = len(valid_30d)
+        # 对话发起（近 30 天）
+        conv_30d = detect_conversations(valid_30d)
+        me_starts_30d = sum(1 for c in conv_30d if c[0]["sender"] == "me")
+        them_starts_30d = sum(1 for c in conv_30d if c[0]["sender"] == "them")
+        # 修复发起（近 30 天）
+        me_repair_30d = 0
+        them_repair_30d = 0
+        prev_ts_30d = valid_30d[0]["timestamp"]
+        for m in valid_30d[1:]:
+            if m["timestamp"] - prev_ts_30d >= repair_gap:
+                if m["sender"] == "me":
+                    me_repair_30d += 1
+                elif m["sender"] == "them":
+                    them_repair_30d += 1
+            prev_ts_30d = m["timestamp"]
+        # 对方消息密度方差系数（按天聚合）
+        import math
+        them_daily = defaultdict(int)
+        for m in valid_30d:
+            if m["sender"] == "them":
+                day = datetime.fromtimestamp(m["timestamp"]).strftime("%Y-%m-%d")
+                them_daily[day] += 1
+        daily_vals = list(them_daily.values())
+        if len(daily_vals) >= 2:
+            mean_d = sum(daily_vals) / len(daily_vals)
+            variance = sum((v - mean_d) ** 2 for v in daily_vals) / len(daily_vals)
+            cv = round(math.sqrt(variance) / mean_d, 3) if mean_d > 0 else 0.0
+        else:
+            cv = 0.0
+        stats["recent_30d"] = {
+            "me_messages": me_30d,
+            "them_messages": them_30d,
+            "total_messages": total_30d,
+            "me_initiation_ratio": round(me_starts_30d / max(me_starts_30d + them_starts_30d, 1), 3),
+            "them_initiation_ratio": round(them_starts_30d / max(me_starts_30d + them_starts_30d, 1), 3),
+            "me_repair_count": me_repair_30d,
+            "them_repair_count": them_repair_30d,
+            "them_message_density_cv": cv,
+        }
+    else:
+        stats["recent_30d"] = None
+
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
-
-    # 导出纯文本完整对话记录，供大模型进行全量分析
-    chat_history_path = os.path.join(os.path.dirname(os.path.abspath(args.output)), "chat_history.txt")
-    try:
-        with open(chat_history_path, "w", encoding="utf-8") as f:
-            for m in text_msgs:
-                sender_name = "Me" if m["sender"] == "me" else contact_display
-                dt = datetime.fromtimestamp(m["timestamp"]).strftime("%Y-%m-%d %H:%M")
-                content = m["content"].replace("\n", "  ")
-                f.write(f"[{dt}] {sender_name}: {content}\n")
-        print(f"[+] 已导出全量纯文本聊天记录至: {chat_history_path}", file=sys.stderr)
-    except Exception as e:
-        print(f"[!] 导出全量聊天记录失败: {e}", file=sys.stderr)
 
     s = stats["scores"]
     print(f"[+] 分析完成: 主动={s['simp_index']} 被爱={s['loved_index']} 冷淡={s['cold_index']}", file=sys.stderr)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目简介
 
-**她爱我吗？恋情分析室** 是一个通用 Agent Skill，通过解密本地微信数据库、分析聊天记录，结合心理学框架生成恋爱关系分析报告。所有数据处理均在本地完成，不上传任何服务器。
+**她不一样** 是一个通用 Agent Skill，通过解密本地微信数据库、分析聊天记录，结合心理学框架生成恋爱关系分析报告。所有数据处理均在本地完成，不上传任何服务器。
 
 主入口：`/she-love-me`（Skill 命令）
 
@@ -44,44 +44,55 @@ python scripts/generate_html_report.py \
 ```
 /she-love-me (Skill 命令)
     ↓
-scripts/setup_check.py      # 环境检查：Python 版本、clone vendor、安装依赖、检测微信进程
+scripts/setup_check.py        # 环境检查：Python 版本、clone vendor、安装依赖、检测微信进程
     ↓
-scripts/decrypt_wechat.py   # 解密入口：Windows 走 Python 扫描，macOS 编译并调用 C 扫描器
+scripts/decrypt_wechat.py     # 解密入口：Windows 走 Python 扫描，macOS 编译并调用 C 扫描器
     ↓
-vendor/wechat-decrypt/      # 上游解密器（自动 clone，gitignored）
-  decrypted/                # 解密后的 SQLite 文件（contact.db, message_N.db, session.db）
+vendor/wechat-decrypt/        # 上游解密器（首次自动 clone，gitignored）
+  decrypted/                  # 解密后的 SQLite 文件（contact.db, message_N.db, session.db）
     ↓
-scripts/list_contacts.py → scripts/extract_messages.py → scripts/stats_analyzer.py
+scripts/list_contacts.py → scripts/extract_messages.py
     ↓
-data/messages.json + data/stats.json
+data/messages.json
     ↓
-Claude AI 深度鉴定（读取 300 条近期消息 + 统计数据）→ data/analysis.json
+scripts/stats_analyzer.py → data/stats.json        # 全量统计
+scripts/build_chat_history.py → data/chat_history.txt  # 分层采样（用户选定时间范围）
+    ↓
+Claude AI 深度鉴定（全量统计 + 分层采样关键窗口）→ data/analysis.json
     ↓
 scripts/generate_html_report.py → reports/*.html
 ```
 
 ## Skill 结构
 
-- `.claude/skills/she-love-me/SKILL.md` — Claude Code 入口，定义完整的 8 步执行流程
-- `.agents/skills/she-love-me/SKILL.md` — 通用格式（Cursor / Copilot / Gemini CLI）
-- `.claude/settings.json` — 注册 Skill 路径
+- `.agents/skills/she-love-me/SKILL.md` — 唯一源文件（Claude Code + Cursor/Copilot/Gemini CLI 共用）
+- `.agents/skills/she-love-me/references/` — 知识库（从 SKILL.md 拆出，按需读取）
+  - `analysis-framework.md` — 模块 F + A + B 心理学分析框架
+  - `risk-signals.md` — 模块 C 危险预警 7 类信号
+  - `strategist-guide.md` — 模块 D + E + G 军师指南 + 语气风格
+  - `report-schema.md` — analysis.json 完整 JSON schema
+  - `report-template.md` — Step 9 Markdown 展示模板
+- `.claude/settings.json` — 注册 Skill 路径（指向 `.agents/skills/she-love-me`）
 
-SKILL.md 中定义了 AI 分析的五个模块：
-- **模块 A**：关系诊断（Sternberg 三角、Gottman 四骑士、关系趋势）
-- **模块 B**：人格分析（依恋类型、沟通风格、爱的语言）
+AI 分析模块（F → A → B → C → D → E → G）：
+- **模块 F**：人格深度画像（核心恐惧、防御机制、底层需求、信任架构）
+- **模块 A**：关系诊断（Sternberg 三角、Gottman 四骑士、关系阶段、不对称分析）
+- **模块 B**：人格分析（依恋类型、沟通风格、爱的语言、情感可得性）
 - **模块 C**：危险预警（7 类高风险信号）
-- **模块 D**：军师建议（停止/开始各 3 条 + 路线图）
+- **模块 D**：军师建议（停止/开始各 3 条 + 路线图 + 止损红线）
 - **模块 E**：5 条鉴定发现（引用原文）
+- **模块 G**：童锦程祖师爷寄语
 
 ## 数据流与目录约定
 
 | 目录/文件 | 说明 |
 |-----------|------|
-| `vendor/wechat-decrypt/` | 上游解密器，自动 clone（gitignored） |
+| `vendor/wechat-decrypt/` | 上游解密器，首次自动 clone（gitignored） |
 | `vendor/wechat-decrypt/decrypted/` | 解密后的 SQLite 文件 |
 | `data/messages.json` | 提取的消息（中间数据，gitignored） |
-| `data/stats.json` | 统计结果 |
-| `data/analysis.json` | Claude AI 分析结果（JSON 结构见 SKILL.md） |
+| `data/stats.json` | 全量统计结果 |
+| `data/chat_history.txt` | 分层采样聊天记录（用户选定范围 + 关键窗口） |
+| `data/analysis.json` | Claude AI 分析结果（JSON schema 见 references/report-schema.md） |
 | `reports/` | 生成的 HTML 报告（gitignored） |
 
 ## 依赖说明

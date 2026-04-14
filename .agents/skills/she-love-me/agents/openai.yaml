@@ -1,5 +1,5 @@
 interface:
-  display_name: "她爱我吗？恋情分析室"
+  display_name: "她不一样"
   short_description: "分析微信或 QQ 聊天记录，生成恋爱关系诊断与 HTML 报告"
   brand_color: "#E11D48"
   default_prompt: "使用 she-love-me 技能，先确认平台（微信或 QQ），再按技能流程完成消息提取、统计分析和报告生成。"

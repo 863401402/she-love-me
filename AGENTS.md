@@ -3,8 +3,8 @@
 ## Repository Focus
 
 - This repository packages the `she-love-me` workflow for analyzing WeChat or QQ chat histories and generating an HTML relationship report.
-- The vendor-neutral skill entrypoint for Codex is `.agents/skills/she-love-me/SKILL.md`.
-- The Claude-specific mirror under `.claude/skills/she-love-me/SKILL.md` exists for Claude Code and OpenClaw compatibility.
+- The unified skill entrypoint for all tools is `.agents/skills/she-love-me/SKILL.md` (Claude Code, OpenClaw, Codex, Cursor, Copilot, Gemini CLI).
+- Analysis knowledge is split across `references/` under that directory; SKILL.md is a control-plane only (~200 lines).
 
 ## Codex Guidance
 

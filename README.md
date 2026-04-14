@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="她爱我吗？恋情分析室" width="860" />
+<img src="assets/banner.svg" alt="她不一样.Skill" width="860" />
 
 <br/>
 
@@ -36,15 +36,23 @@ $ curl -s https://raw.githubusercontent.com/863401402/she-love-me/main/GUIDE.md
 
 ## 简介
 
-**她爱我吗？** 是一个**通用 Agent Skill**，支持 Claude Code、Codex、Cursor、GitHub Copilot、Gemini CLI 等主流 AI 编程工具。
+**她不一样** 是一个**通用 Agent Skill**，支持 Claude Code、Codex、Cursor、GitHub Copilot、Gemini CLI 等主流 AI 编程工具。
 
-只需要一句调用指令（例如 Claude 里输入 `/she-love-me`，Codex 里输入 `$she-love-me`），它就能自动解密你的微信数据库（或通过 QCE 提取 QQ 记录）、分析你和某个联系人的全部聊天记录，然后告诉你：**这段关系里，谁更在意？她真的爱你吗？**
+只需要一句调用指令（例如 Claude 里输入 `/she-love-me`，Codex 里输入 `$she-love-me`），它就能自动解密你的微信数据库（或通过 QCE 提取 QQ 记录）、分析你和某个联系人的全部聊天记录，帮你看清：**她是不是真的不一样——这段感情里，你们到底是什么关系？**
 
-v2.0 起融入专业心理学框架，不只给结论——还做**依恋类型诊断**、**Gottman 关系健康检测**、**危险信号预警**，并以军师身份给出具体可执行的建议。
+融入专业心理学框架（依恋类型 · Gottman · Sternberg 三角），支持**危险信号预警**、**军师建议**、**👴 祖师爷寄语**，全程本地运行，数据不上传任何服务器。
 
-v2.2 起支持 **QQ 聊天记录分析**（通过 [QQ Chat Exporter](https://github.com/shuakami/qq-chat-exporter)），微信与 QQ 统一流程，同一份报告。
+---
 
-> 分析全程在本地运行，数据不上传任何服务器。
+## 交流群
+
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/863401402/she-love-me/main/assets/jiaoliuqun.jpg" width="220" alt="微信交流群" />
+
+*扫码加入微信交流群，遇到问题、分享鉴定结果、更新优化方向都可以聊*
+
+</div>
 
 ---
 
@@ -52,10 +60,10 @@ v2.2 起支持 **QQ 聊天记录分析**（通过 [QQ Chat Exporter](https://git
 
 > *(首次运行后，在 `reports/` 目录用浏览器打开 HTML 报告)*
 
-### 鉴定指数
+### 分析指数
 
 ```
-📊 主动指数   73 ████████░░  你发起对话 72%，偶尔连轰 767 次
+🔥 主动指数   73 ████████░░  你发起对话 72%，偶尔连轰 767 次
 💜 被爱指数   66 ███████░░░  她凌晨 3 点发了 8 条消息说想你
 🧊 冷淡指数   28 ███░░░░░░░  回复速度 8 分钟，态度还行
 ```
@@ -120,7 +128,7 @@ v2.2 起支持 **QQ 聊天记录分析**（通过 [QQ Chat Exporter](https://git
 
 - 任意一个支持 Skill 或 `AGENTS.md` 的 AI 编程工具（见下方）
 
-### 安装
+### 安装与运行
 
 ```bash
 git clone https://github.com/863401402/she-love-me
@@ -200,22 +208,22 @@ $she-love-me
 **微信路径：**
 
 ```
-WeChat 4.0（运行中）
+WeChat（运行中）/ NapCat + QCE（QQ）
     │
-    │  内存扫描，提取 SQLCipher4 密钥
+    │  微信：内存扫描提取密钥 → wechat-decrypt 解密数据库
+    │  QQ：REST API 导出聊天记录
     ▼
-wechat-decrypt（自动 clone）
+标准 SQLite / JSON 消息数据
     │
-    │  解密 19 个数据库文件
+    ├─► stats_analyzer.py → stats.json（全量统计：主动性/回复速度/语言学特征）
+    │
+    ├─► build_chat_history.py（用户动态选择分析范围）
+    │       → chat_history.txt（分层采样：起源窗口 / 高冲突区间 / 近30天 / 修复时刻）
     ▼
-标准 SQLite 文件（contact.db · message_N.db · session.db）
-    │
-    │  scripts/ 统计分析引擎
-    ▼
-主动指数 / 被爱指数 / 成分表 / 趋势数据
-    │
-    │  AI Agent：Sternberg 三角 · Gottman 四骑士 · 依恋类型
-    │            权力动态 · 情感可得性 · 危险预警 · 军师建议
+AI Agent 深度分析（全量统计 + 分层采样关键窗口）
+    │  Sternberg 三角（信号计数推导）· Gottman 正负比（词典+文本校正）
+    │  对称性评分（stats.json 字段加权）· 双阈值危险预警
+    │  依恋类型 · 核心恐惧 · 防御机制 · 军师建议 · 👴 祖师爷寄语
     ▼
 HTML 报告（暗色现代风格）+ Markdown 摘要
 ```
@@ -246,33 +254,28 @@ HTML 报告 + Markdown 摘要
 
 ```
 she-love-me/
-├── AGENTS.md                  # Codex 仓库级说明与调用约定
-├── .claude/
-│   ├── settings.json           # Skill 注册配置
-│   └── skills/
-│       └── she-love-me/
-│           └── SKILL.md        # Skill 入口（Claude Code / OpenClaw）
-├── .agents/
-│   └── skills/
-│       └── she-love-me/
-│           ├── SKILL.md        # Skill 入口（Codex / Cursor / Copilot / Gemini CLI）
-│           └── agents/
-│               └── openai.yaml # Codex 元数据（显示名 / 默认提示 / 品牌色）
+├── .agents/skills/she-love-me/
+│   ├── SKILL.md                               # 唯一 Skill 入口（所有工具共用）
+│   ├── agents/openai.yaml
+│   └── references/                            # 知识库（SKILL.md 按需读取）
+│       ├── analysis-framework.md              # 心理学分析框架（模块 F / A / B）
+│       ├── risk-signals.md                    # 危险预警 7 类信号 + 双阈值触发规则
+│       ├── strategist-guide.md                # 军师 / 童锦程寄语 / 语气风格
+│       ├── report-schema.md                   # analysis.json 结构 + 评分推导规则
+│       └── report-template.md                 # Step 9 Markdown 展示模板
+├── .claude/settings.json                      # Claude Code Skill 路径注册
+├── references/tong-jincheng/                  # 祖师爷心智模型参考材料
 ├── scripts/
-│   ├── setup_check.py          # 跨平台环境检查 / 依赖准备 / 微信进程检测
-│   ├── decrypt_wechat.py       # 跨平台解密入口（macOS 走 C 扫描器）
-│   ├── list_contacts.py        # 列出微信联系人（按消息数排序）
-│   ├── list_contacts_qq.py     # 列出 QQ 好友（通过 QCE API）
-│   ├── extract_messages.py     # 提取微信消息
-│   ├── extract_messages_qq.py  # 提取 QQ 消息（通过 QCE API，转换为统一格式）
-│   ├── stats_analyzer.py       # 统计分析引擎（微信/QQ 共用）
-│   └── generate_html_report.py # 生成 HTML 报告（微信/QQ 共用）
-├── vendor/                     # wechat-decrypt 自动 clone 到这里（gitignore）
-├── data/                       # 分析中间数据（gitignore）
-├── reports/                    # 生成的 HTML 报告（gitignore）
-├── assets/                     # README 截图
-├── requirements.txt
-└── LICENSE
+│   ├── setup_check.py                         # 环境检查 / 依赖准备
+│   ├── decrypt_wechat.py                      # 微信解密入口
+│   ├── list_contacts.py / list_contacts_qq.py
+│   ├── extract_messages.py / extract_messages_qq.py
+│   ├── stats_analyzer.py                      # 全量统计分析引擎
+│   ├── build_chat_history.py                  # 分层采样：动态范围选择 + 关键窗口提取
+│   └── generate_html_report.py                # HTML 报告生成（微信/QQ 共用）
+├── vendor/                                    # wechat-decrypt（gitignore）
+├── data/                                      # 分析中间数据（gitignore）
+└── reports/                                   # 生成的 HTML 报告（gitignore）
 ```
 
 ---
@@ -292,9 +295,12 @@ she-love-me/
 
 - **v1.0**：文字消息分析 · HTML 报告 · 主动/被爱/冷淡指数
 - **v2.0**：依恋类型诊断 · Sternberg 三角 · Gottman 四骑士 · 危险预警 · 军师模式
-- **v2.1**：核心恐惧分析 · 情感可得性评估 · 权力动态量化 · 修复尝试分析 · 追逃循环复盘 · 止损红线 · 时机指引
-- **v2.2**（当前）：**QQ 聊天记录支持**（通过 QQ Chat Exporter API）· 微信/QQ 统一分析管线 · 无需解密直接通过 API 导出
-- **v3.0**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
+- **v2.1**：核心恐惧分析 · 情感可得性评估 · 权力动态量化 · 修复尝试分析 · 追逃循环复盘 · 止损红线
+- **v2.2**：**QQ 聊天记录支持**（通过 QQ Chat Exporter API）· 微信/QQ 统一分析管线
+- **v2.3**：👴 **祖师爷寄语**（童锦程视角）· 推进关系三条实招 · 关系地位指南
+- **v3.0**：🔄 **品牌重构**「她不一样」· 叙事框架升级 · 分析模块微调 · HTML 报告开源地址
+- **v3.1**（当前）：🏗️ **架构重构** · SKILL.md 控制平面拆分（980 行 → 228 行）· 双入口合一 · 分层采样引擎（`build_chat_history.py`）· 动态范围选择 · 评分推导规则（对称性/Sternberg/Gottman 均有字段来源）· 双阈值危险预警 · 可空字段设计
+- **v3.2**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
 
 ---
 
@@ -314,40 +320,26 @@ she-love-me/
 
 ## 致谢
 
-本项目的微信数据库解密能力完全来自：
+> **[ylytdeng/wechat-decrypt](https://github.com/ylytdeng/wechat-decrypt)** — WeChat 4.0 数据库解密器，本项目微信能力的基础 🙏
 
-> **[ylytdeng/wechat-decrypt](https://github.com/ylytdeng/wechat-decrypt)**
->
-> WeChat 4.0 database decryptor — 通过内存扫描提取 SQLCipher4 密钥，实时解密微信数据库。
-> 没有这个项目，本工具无从实现。感谢作者的开源贡献 🙏
+> **[shuakami/qq-chat-exporter](https://github.com/shuakami/qq-chat-exporter)** — NapCat + QCE 插件，QQ 聊天记录导出方案 🙏
+
+> **[hotcoffeeshake/tong-jincheng-skill](https://github.com/hotcoffeeshake/tong-jincheng-skill)** — 祖师爷童锦程心智模型与语录整理 🙏
 
 ---
 
 ## 免责声明
 
-- 本工具**仅供娱乐**，鉴定结果不构成任何情感建议
-- **仅用于分析你自己的微信数据**，请勿侵犯他人隐私
-- 所有数据处理在本地完成，不上传至任何服务器
-- 使用前请确认当地法律法规
-
----
-
-## 交流群
-
-<div align="center">
-
-<img src="assets/jiaoliuqun.jpg" width="220" alt="微信交流群" />
-
-*扫码加入微信交流群，遇到问题、分享鉴定结果、更新优化方向都可以聊*
-
-</div>
+本工具仅供娱乐，不构成情感建议。仅用于分析你自己的数据，请勿侵犯他人隐私。所有数据本地处理，不上传任何服务器。
 
 ---
 
 <div align="center">
 
-**MIT License © 2026 她爱我吗？恋情分析室**
+**MIT License © 2026 她不一样**
 
 *如果这个项目帮你想通了什么，记得给个 ⭐*
 
 </div>
+
+> 曾用名：「她爱我吗？恋情分析室」· 前身：舔狗鉴定所
