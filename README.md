@@ -93,6 +93,22 @@
 
 ## 快速开始
 
+###  一键部署
+
+👇 **把这句话发给你的 Codex / OpenClaw，快速接入 she-love-me**
+
+```text
+$ curl -s https://raw.githubusercontent.com/863401402/she-love-me/main/GUIDE.md
+```
+
+> `guide.md` 只负责快速引导；项目本身已经内置 `AGENTS.md`、Skill 和配置文件，Agent 读取后可直接继续完成初始化与使用。
+
+> 如果你是在会话启动后才 `clone` 仓库或切换到新分支，部分 Agent 需要在仓库根目录重开一次会话，才能重新加载仓库级 Skill（例如 Codex 中重新进入仓库根目录后再启动并触发 `$she-love-me`）。
+
+---
+
+
+
 ### 前置条件
 
 **微信分析**：
