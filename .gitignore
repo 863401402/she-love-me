@@ -5,7 +5,6 @@ reports/
 *.db
 *.json.bak
 all_keys.json
-.gitignore
 
 # Python
 __pycache__/
