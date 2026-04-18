@@ -1,5 +1,5 @@
 """
-extract_messages.py - 提取指定联系人的全部消息
+extract_messages.py - 提取指定联系人的全部消息，并生成独立联系人目录中的 messages.json / emojis.json
 
 消息存储结构（WeChat 4.0）：
   - message/message_N.db -> 每个联系人有独立的 Msg_{md5(username)} 表
@@ -7,14 +7,22 @@ extract_messages.py - 提取指定联系人的全部消息
   - real_sender_id 通过 Name2Id 表解析为 username
   - WCDB_CT_message_content == 4 表示 zstd 压缩
   - local_type == 1 文本, 3 图片, 34 语音, 43 视频, 47 表情, 49 链接/文件, 50 通话, 10000 系统
+
+导出结构：
+  - messages.json：聊天消息主体；表情消息只保留 emoji_ref
+  - emojis.json：独立表情目录；保存 emoji_ref 对应的 md5 / cdnurl / len 等元信息
 """
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
 import sqlite3
 import sys
+from xml.etree import ElementTree as ET
+
+from contact_bundle import resolve_bundle_paths
 
 # Windows 控制台 UTF-8 输出
 if sys.platform == "win32":
@@ -60,6 +68,41 @@ def decompress_content(content, ct):
 def get_msg_type(local_type):
     base = local_type & 0xFFFFFFFF if local_type > 0xFFFFFFFF else local_type
     return MSG_TYPE_MAP.get(base, "other")
+
+
+def get_base_local_type(local_type):
+    return local_type & 0xFFFFFFFF if local_type > 0xFFFFFFFF else local_type
+
+
+def parse_emoji_metadata(content):
+    """从表情消息 XML 中提取元信息。"""
+    if not content or not isinstance(content, str) or "<emoji" not in content:
+        return None
+    try:
+        root = ET.fromstring(content)
+        emoji_node = root.find("emoji")
+        if emoji_node is None:
+            return None
+        keep_fields = [
+            "type", "md5", "len", "cdnurl", "thumburl", "encrypturl",
+            "aeskey", "productid", "designerid", "thumbmd5",
+            "androidmd5", "androidlen", "fromusername", "tousername",
+            "externurl", "externmd5",
+        ]
+        meta = {}
+        for key in keep_fields:
+            value = emoji_node.attrib.get(key)
+            if value not in (None, ""):
+                meta[key] = html.unescape(value)
+        return meta or None
+    except Exception:
+        return None
+
+
+def build_emoji_id(meta, local_id):
+    if meta and meta.get("md5"):
+        return f"emoji_{meta['md5']}"
+    return f"emoji_local_{local_id}"
 
 
 def load_contacts(decrypted_dir):
@@ -124,6 +167,7 @@ def get_own_wxid(decrypted_dir):
 
 def extract_messages_from_db(db_path, table_name, id_to_username, own_wxid, contact_username, contact_display):
     messages = []
+    emoji_records = {}
     try:
         conn = sqlite3.connect(db_path)
         try:
@@ -138,6 +182,8 @@ def extract_messages_from_db(db_path, table_name, id_to_username, own_wxid, cont
                 local_id, local_type, create_time, real_sender_id, content, ct = row
                 content = decompress_content(content, ct)
                 msg_type = get_msg_type(local_type)
+                base_local_type = get_base_local_type(local_type)
+                emoji_meta = parse_emoji_metadata(content) if msg_type == "emoji" else None
 
                 # 判断发送方
                 sender_username = id_to_username.get(real_sender_id, "")
@@ -184,27 +230,62 @@ def extract_messages_from_db(db_path, table_name, id_to_username, own_wxid, cont
                     else:
                         display_content = "[链接/文件]"
 
-                messages.append({
+                record = {
                     "local_id": local_id,
                     "sender": sender,
                     "content": display_content,
                     "timestamp": create_time,
                     "type": msg_type,
-                })
+                    "local_type": base_local_type,
+                }
+                if emoji_meta:
+                    emoji_id = build_emoji_id(emoji_meta, local_id)
+                    record["emoji_ref"] = emoji_id
+                    existing = emoji_records.get(emoji_id)
+                    if not existing:
+                        emoji_records[emoji_id] = {
+                            "emoji_id": emoji_id,
+                            "md5": emoji_meta.get("md5"),
+                            "type": emoji_meta.get("type"),
+                            "len": emoji_meta.get("len"),
+                            "cdnurl": emoji_meta.get("cdnurl"),
+                            "thumburl": emoji_meta.get("thumburl"),
+                            "encrypturl": emoji_meta.get("encrypturl"),
+                            "aeskey": emoji_meta.get("aeskey"),
+                            "productid": emoji_meta.get("productid"),
+                            "designerid": emoji_meta.get("designerid"),
+                            "thumbmd5": emoji_meta.get("thumbmd5"),
+                            "androidmd5": emoji_meta.get("androidmd5"),
+                            "androidlen": emoji_meta.get("androidlen"),
+                            "fromusername": emoji_meta.get("fromusername"),
+                            "tousername": emoji_meta.get("tousername"),
+                            "externurl": emoji_meta.get("externurl"),
+                            "externmd5": emoji_meta.get("externmd5"),
+                            "first_local_id": local_id,
+                            "first_timestamp": create_time,
+                            "occurrence_count": 1,
+                        }
+                    else:
+                        existing["occurrence_count"] = existing.get("occurrence_count", 0) + 1
+                messages.append(record)
         finally:
             conn.close()
     except Exception as e:
         print(f"[!] 读取 {db_path} 失败: {e}", file=sys.stderr)
 
-    return messages
+    return messages, emoji_records
 
 
 def main():
     parser = argparse.ArgumentParser(description="提取指定联系人的微信消息")
     parser.add_argument("--decrypted-dir", required=True)
     parser.add_argument("--contact", required=True, help="联系人名字（备注名/昵称/wxid）")
-    parser.add_argument("--output", required=True, help="输出 JSON 文件路径")
+    parser.add_argument("--output", help="输出 messages.json 文件路径；不传时可配合 --output-dir 使用")
+    parser.add_argument("--output-dir", help="按联系人自动创建导出目录，例如 data/contacts")
     args = parser.parse_args()
+
+    if not args.output and not args.output_dir:
+        parser.error("必须提供 --output 或 --output-dir 其中之一")
 
     decrypted_dir = os.path.abspath(args.decrypted_dir)
     names = load_contacts(decrypted_dir)
@@ -232,7 +313,15 @@ def main():
         if re.match(r"message_\d+\.db$", f)
     ])
 
+    bundle = resolve_bundle_paths(
+        contact_display=contact_display,
+        contact_username=contact_username,
+        output=args.output,
+        output_dir=args.output_dir,
+    )
+
     all_messages = []
+    emoji_catalog = {}
     for db_file in msg_dbs:
         db_path = os.path.join(msg_dir, db_file)
         conn = sqlite3.connect(db_path)
@@ -254,9 +343,17 @@ def main():
                 pass
             conn.close()
 
-            msgs = extract_messages_from_db(db_path, table_name, id_to_username, own_wxid,
-                                            contact_username, contact_display)
+            msgs, emojis = extract_messages_from_db(db_path, table_name, id_to_username, own_wxid,
+                                                    contact_username, contact_display)
             all_messages.extend(msgs)
+            for emoji_id, meta in emojis.items():
+                if emoji_id not in emoji_catalog:
+                    emoji_catalog[emoji_id] = meta
+                else:
+                    emoji_catalog[emoji_id]["occurrence_count"] = (
+                        emoji_catalog[emoji_id].get("occurrence_count", 0)
+                        + meta.get("occurrence_count", 0)
+                    )
         except Exception:
             try:
                 conn.close()
@@ -270,16 +367,42 @@ def main():
         "contact_username": contact_username,
         "contact_display": contact_display,
         "own_wxid": own_wxid or "unknown",
+        "bundle_dir": bundle["bundle_dir"],
         "total": len(all_messages),
+        "emoji_total": sum(1 for m in all_messages if m.get("type") == "emoji"),
+        "emoji_catalog_file": os.path.basename(bundle["emojis_path"]),
         "messages": all_messages,
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
+    emoji_result = {
+        "contact_username": contact_username,
+        "contact_display": contact_display,
+        "bundle_dir": bundle["bundle_dir"],
+        "total_messages": result["emoji_total"],
+        "unique_emojis": len(emoji_catalog),
+        "emoji_records": sorted(
+            emoji_catalog.values(),
+            key=lambda x: (x.get("first_timestamp", 0), x.get("emoji_id", "")),
+        ),
+    }
 
-    print(f"[+] 已提取 {len(all_messages)} 条消息 -> {args.output}", file=sys.stderr)
-    print(json.dumps({"status": "ok", "total": len(all_messages), "contact": contact_display}))
+    os.makedirs(bundle["bundle_dir"], exist_ok=True)
+    with open(bundle["messages_path"], "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    with open(bundle["emojis_path"], "w", encoding="utf-8") as f:
+        json.dump(emoji_result, f, ensure_ascii=False, indent=2)
+
+    print(f"[+] 已提取 {len(all_messages)} 条消息 -> {bundle['messages_path']}", file=sys.stderr)
+    print(f"[+] 已导出 {result['emoji_total']} 条表情消息 -> {bundle['emojis_path']}", file=sys.stderr)
+    print(json.dumps({
+        "status": "ok",
+        "total": len(all_messages),
+        "emoji_total": result["emoji_total"],
+        "contact": contact_display,
+        "bundle_dir": bundle["bundle_dir"],
+        "messages_path": bundle["messages_path"],
+        "emojis_path": bundle["emojis_path"],
+    }, ensure_ascii=False))
 
 
 if __name__ == "__main__":

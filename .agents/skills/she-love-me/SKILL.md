@@ -85,8 +85,37 @@ description: >-
 <PYTHON> scripts/extract_messages.py \
   --decrypted-dir vendor/wechat-decrypt/decrypted \
   --contact "<用户选择的联系人名字>" \
-  --output data/messages.json
+  --output-dir data/contacts
 ```
+
+脚本会自动创建联系人独立目录，例如：
+
+- `data/contacts/<联系人>__<hash>/messages.json`
+- `data/contacts/<联系人>__<hash>/emojis.json`
+
+**重要**：后续 Step 6 及之后的所有输入文件，都应优先使用 Step 5 返回 JSON 中的 `bundle_dir / messages_path / emojis_path`，不要再硬编码写回 `data/messages.json`。
+
+其中：
+
+- `messages.json`：聊天记录主体；表情消息只保留 `emoji_ref`
+- `emojis.json`：独立表情记录；保存 `md5 / cdnurl / len / fromusername / tousername` 等元信息
+
+### Step 5.5: （可选）导出表情资源（微信专用）
+
+仅当用户明确要求查看、导出、下载、整理或预览微信表情时执行。
+
+```bash
+<PYTHON> scripts/export_emojis.py --input "<Step 5 返回的 messages_path>"
+```
+
+默认输出：
+
+- `<bundle_dir>/emojis.json` / `<bundle_dir>/emojis.csv`：表情清单
+- `<bundle_dir>/emojis_assets/`：去重下载后的本地表情资源
+- `<bundle_dir>/emojis_download_manifest.json`：下载结果
+- `<bundle_dir>/emojis_preview.html`：本地浏览器预览页
+
+并会把下载结果写入 `emojis.json`，同时在 `messages.json` 顶层记录 `emoji_export` 信息。
 
 ---
 
@@ -124,11 +153,11 @@ description: >-
 <PYTHON> scripts/extract_messages_qq.py \
   --token "$QCE_TOKEN" \
   --contact "<用户选择的联系人名字/QQ号>" \
-  --output data/messages.json
+  --output-dir data/contacts
 ```
 
 找不到联系人 → 建议直接用 QQ 号（纯数字）。
-导出完成后自动转换为统一的 `messages.json` 格式，后续步骤与微信相同。
+导出完成后自动转换为统一的 `messages.json` 格式，并放入联系人独立目录；后续步骤与微信相同。
 
 ---
 
@@ -138,18 +167,18 @@ description: >-
 
 ```bash
 <PYTHON> scripts/stats_analyzer.py \
-  --input data/messages.json \
-  --output data/stats.json
+  --input "<messages_path>" \
+  --output "<bundle_dir>/stats.json"
 ```
 
-读取 `data/stats.json`，获取全量统计数据。
+读取 `<bundle_dir>/stats.json`，获取全量统计数据。
 
 ### Step 6.5: 采样范围选择
 
 **阶段 1：预扫描**，向用户展示时间范围与消息条数，等待选择：
 
 ```bash
-<PYTHON> scripts/build_chat_history.py --input data/messages.json --preview
+<PYTHON> scripts/build_chat_history.py --input "<messages_path>" --preview
 ```
 
 输出 JSON 包含各时间范围的条数和推荐项。向用户展示（格式示例）：
@@ -166,8 +195,8 @@ description: >-
 
 ```bash
 <PYTHON> scripts/build_chat_history.py \
-  --input data/messages.json \
-  --output data/chat_history.txt \
+  --input "<messages_path>" \
+  --output "<bundle_dir>/chat_history.txt" \
   --since <用户选择对应的 date_from>
 ```
 
@@ -176,8 +205,8 @@ description: >-
 ### Step 7: AI 深度鉴定（核心）
 
 读取以下两个文件：
-- `data/stats.json` — **全量统计数据**（消息频率、回复时间、情绪词、语言学特征等）
-- `data/chat_history.txt` — **分层采样的关键窗口**（关系起源 / 高冲突区间 / 最近30天 / 修复时刻）
+- `<bundle_dir>/stats.json` — **全量统计数据**（消息频率、回复时间、情绪词、语言学特征等）
+- `<bundle_dir>/chat_history.txt` — **分层采样的关键窗口**（关系起源 / 高冲突区间 / 最近30天 / 修复时刻）
 
 > 统计层已覆盖全量，叙事分析基于采样窗口 + 统计数据综合判断，不要仅凭窗口内的消息下结论。
 
@@ -197,16 +226,16 @@ description: >-
 4. **防御语言是金矿** — 「不合适」「随便」「来者不拒」永远追问：这句话保护了什么？想让对方做什么？
 5. **证据不足留白** — 对于 `partner_attachment`、`core_fear`、`trauma_bonding`、`future_faking`、`fatal_mistake`、`advancement_path` 等字段，若无充分证据支撑，输出 `{"value": null, "evidence_level": "insufficient", "reason": "..."}` 而非强行推断
 
-将完整分析结果保存到 `data/analysis.json`。
+将完整分析结果保存到 `<bundle_dir>/analysis.json`。
 
 ### Step 8: 生成报告
 
 ```bash
 <PYTHON> scripts/generate_html_report.py \
-  --stats data/stats.json \
-  --analysis data/analysis.json \
+  --stats "<bundle_dir>/stats.json" \
+  --analysis "<bundle_dir>/analysis.json" \
   --contact "<联系人名字>" \
-  --output reports/
+  --output "<bundle_dir>/reports/"
 ```
 
 ### Step 9: 展示结论
@@ -227,3 +256,6 @@ description: >-
 | 找不到联系人 | 列出相似名字供用户重新选择 |
 | 数据库解密失败 | 检查 `vendor/wechat-decrypt/config.json` 中的 `db_dir` |
 | messages.json 不存在 | 提示先运行 Step 5 提取消息 |
+| 用户要看表情但 `messages.json` 无 `emoji` 元信息 | 重新运行 Step 5，确认使用的是最新 `scripts/extract_messages.py` |
+| 表情下载失败 | 查看 `<bundle_dir>/emojis_download_manifest.json`；常见原因是 CDN 链接失效或超时 |
+| 不同联系人数据互相覆盖 | 必须使用 `--output-dir data/contacts`，并继续沿用 Step 5 返回的 `bundle_dir` |

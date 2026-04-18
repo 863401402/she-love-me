@@ -87,6 +87,9 @@
 | 👴 **祖师爷寄语** | 童锦程视角 · 读局 + 推进关系三条实招 + 关系地位指南 + 金句收尾 |
 | 🔍 **AI 深度鉴定** | 全量统计层（stats.json）+ 用户选定范围分层采样，三层架构避免"全量幻觉"，评分有推导来源不靠模型主观拍板 |
 | 🎯 **动态采样选择** | 自动推荐分析时间范围（1个月/3个月/半年/全量），展示每个选项的消息条数，由用户决定分析窗口 |
+| 😄 **聊天 / 表情分离存储** | `messages.json` 只保留 `emoji_ref`，详细元信息放入独立的 `emojis.json`，结构更简洁 |
+| 🗂️ **按联系人独立目录导出** | 每个联系人自动导出到 `data/contacts/<联系人>__<hash>/`，避免不同对象的数据相互覆盖 |
+| 🖼️ **表情本地下载与预览** | `export_emojis.py` 可批量下载微信表情到联系人目录下的 `emojis_assets/`，并生成 `emojis_preview.html` |
 | 📄 **双格式输出** | 终端 Markdown 摘要 + 可分享的 HTML 报告 |
 
 ---
@@ -133,6 +136,30 @@ cd she-love-me
 | [Codex](https://developers.openai.com/codex/overview) | `$she-love-me` 或直接说"使用 she-love-me 分析聊天记录" |
 
 **就这些。** Skill 会先询问平台（微信 / QQ），然后自动处理一切——解密、提取、分析、生成报告。
+
+### 可选：导出微信表情资源
+
+如果你想把某个联系人的微信表情也一起整理出来：
+
+```bash
+python scripts/extract_messages.py \
+  --decrypted-dir vendor/wechat-decrypt/decrypted \
+  --contact "联系人名字" \
+  --output-dir data/contacts
+
+python scripts/export_emojis.py \
+  --input "data/contacts/<联系人目录>/messages.json"
+```
+
+默认会在该联系人目录下生成：
+
+- `messages.json`：聊天记录（表情消息仅保留 `emoji_ref`）
+- `emojis.json` / `emojis.csv`：独立表情记录与清单
+- `emojis_assets/`：去重下载后的表情资源
+- `emojis_download_manifest.json`：下载结果
+- `emojis_preview.html`：本地浏览器预览页
+
+这样聊天记录和表情记录**分开但不断链**：`messages.json` 的某条表情消息通过 `emoji_ref` 关联到 `emojis.json` 中的具体表情数据。
 
 ---
 
@@ -183,12 +210,15 @@ she-love-me/
 │   ├── decrypt_wechat.py                      # 微信解密入口
 │   ├── list_contacts.py / list_contacts_qq.py
 │   ├── extract_messages.py / extract_messages_qq.py
+│   ├── contact_bundle.py                      # 统一生成联系人导出目录与各类默认路径
+│   ├── export_emojis.py                       # 读取 emojis.json / 下载本地资源 / 生成预览页
 │   ├── stats_analyzer.py                      # 全量统计分析引擎
 │   ├── build_chat_history.py                  # 分层采样：动态范围选择 + 关键窗口提取
 │   └── generate_html_report.py                # HTML 报告生成（微信/QQ 共用）
 ├── vendor/                                    # wechat-decrypt（gitignore）
-├── data/                                      # 分析中间数据（gitignore）
-└── reports/                                   # 生成的 HTML 报告（gitignore）
+├── data/
+│   └── contacts/<联系人>__<hash>/             # 每个联系人的独立导出目录（gitignore）
+└── reports/                                   # 其他生成的 HTML 报告（gitignore）
 ```
 
 ---
@@ -212,7 +242,7 @@ she-love-me/
 - **v2.3**：👴 **祖师爷寄语**（童锦程视角）· 推进关系三条实招 · 关系地位指南
 - **v3.0**：🔄 **品牌重构**「她不一样」· 叙事框架升级 · 分析模块微调 · HTML 报告开源地址
 - **v3.1**（当前）：🏗️ **架构重构** · SKILL.md 控制平面拆分（980 行 → 228 行）· 双入口合一 · 分层采样引擎（`build_chat_history.py`）· 动态范围选择 · 评分推导规则（对称性/Sternberg/Gottman 均有字段来源）· 双阈值危险预警 · 可空字段设计
-- **v3.2**（规划）：语音消息转文字分析 · 图片表情包分析 · Linux 支持完善
+- **v3.2**（当前开发中）：语音消息转文字分析 · **微信表情元信息导出 / 本地下载 / 预览页** · Linux 支持完善
 
 ---
 

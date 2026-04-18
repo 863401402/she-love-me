@@ -593,7 +593,11 @@ def render_patriarch_wisdom(wisdom):
 
     situation = escape_html(wisdom.get("situation_read", ""))
     tactics   = wisdom.get("advance_tactics", [])
-    mistake   = escape_html(wisdom.get("fatal_mistake", ""))
+    fatal_mistake = wisdom.get("fatal_mistake", "")
+    if isinstance(fatal_mistake, dict):
+        mistake = escape_html(fatal_mistake.get("value") or fatal_mistake.get("reason", ""))
+    else:
+        mistake = escape_html(fatal_mistake)
     quote     = escape_html(wisdom.get("closing_quote", ""))
 
     tactics_html = ""
@@ -634,7 +638,7 @@ def render_patriarch_wisdom(wisdom):
     </div>"""
 
 
-
+def render_html(stats, analysis, contact_name):
     scores    = stats.get("scores", {})
     simp      = scores.get("simp_index", 0)
     loved     = scores.get("loved_index", 0)
