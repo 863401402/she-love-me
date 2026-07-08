@@ -700,11 +700,11 @@ def render_html(stats, analysis, contact_name):
     --bg: #0a0a0f;
     --surface: #111118;
     --surface-2: #18181f;
-    --border: rgba(255,255,255,0.06);
-    --border-hover: rgba(255,255,255,0.12);
-    --text: #f0f0f5;
-    --text-muted: #6b6b80;
-    --text-subtle: #3a3a4a;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.15);
+    --text: #f5f5fa;
+    --text-muted: #a0a0b8;
+    --text-subtle: #6a6a80;
     --accent-1: #a855f7;
     --accent-2: #ec4899;
     --accent-3: #3b82f6;
@@ -744,7 +744,7 @@ def render_html(stats, analysis, contact_name):
     pointer-events: none;
   }}
   .hero-eyebrow {{
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: .15em;
     text-transform: uppercase;
@@ -763,20 +763,20 @@ def render_html(stats, analysis, contact_name):
     margin-bottom: 16px;
   }}
   .hero-contact {{
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 500;
     color: var(--text-muted);
     margin-bottom: 8px;
   }}
   .hero-contact span {{ color: var(--text); font-weight: 700; }}
-  .hero-date {{ font-size: 13px; color: var(--text-subtle); }}
+  .hero-date {{ font-size: 16px; color: var(--text-muted); }}
 
   /* ── Layout ── */
   .container {{ max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }}
   .section {{ margin-bottom: 64px; }}
   .section-label {{
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
     letter-spacing: .12em;
     text-transform: uppercase;
     color: var(--text-subtle);
@@ -805,9 +805,9 @@ def render_html(stats, analysis, contact_name):
   .score-card.simp::before {{ background: var(--grad-simp); }}
   .score-card.loved::before {{ background: var(--grad-love); }}
   .score-card.cold::before {{ background: var(--grad-cold); }}
-  .score-emoji {{ font-size: 24px; margin-bottom: 12px; }}
-  .score-label {{ font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }}
-  .score-value {{ font-size: 56px; font-weight: 900; line-height: 1; letter-spacing: -.04em; }}
+  .score-emoji {{ font-size: 28px; margin-bottom: 12px; }}
+  .score-label {{ font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }}
+  .score-value {{ font-size: 68px; font-weight: 900; line-height: 1; letter-spacing: -.04em; }}
   .score-card.simp .score-value {{ background: var(--grad-simp); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }}
   .score-card.loved .score-value {{ background: var(--grad-love); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }}
   .score-card.cold .score-value {{ background: var(--grad-cold); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }}
@@ -831,9 +831,9 @@ def render_html(stats, analysis, contact_name):
     align-items: center;
     gap: 14px;
   }}
-  .ingredient-name {{ font-size: 13px; font-weight: 500; color: var(--text-muted); }}
+  .ingredient-name {{ font-size: 15px; font-weight: 600; color: var(--text); }}
   .ingredient-track {{
-    height: 6px;
+    height: 8px;
     background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
@@ -843,7 +843,7 @@ def render_html(stats, analysis, contact_name):
   .i-loved {{ background: var(--grad-love); }}
   .i-cold {{ background: var(--grad-cold); }}
   .i-tool {{ background: linear-gradient(90deg, #374151, #6b7280); }}
-  .ingredient-pct {{ font-size: 14px; font-weight: 700; text-align: right; }}
+  .ingredient-pct {{ font-size: 16px; font-weight: 700; text-align: right; color: var(--text); }}
 
   /* ── Stat Grid ── */
   .stat-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }}
@@ -856,9 +856,9 @@ def render_html(stats, analysis, contact_name):
     transition: border-color .2s;
   }}
   .stat-card:hover {{ border-color: var(--border-hover); }}
-  .stat-meta {{ font-size: 11px; font-weight: 500; color: var(--text-subtle); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; }}
-  .stat-main {{ font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }}
-  .stat-sub {{ font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }}
+  .stat-meta {{ font-size: 13px; font-weight: 600; color: var(--text-subtle); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; }}
+  .stat-main {{ font-size: 32px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }}
+  .stat-sub {{ font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }}
 
   /* ── Compare Bars ── */
   .compare-list {{ display: flex; flex-direction: column; gap: 20px; }}
@@ -866,14 +866,14 @@ def render_html(stats, analysis, contact_name):
   .compare-header {{
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 8px;
   }}
   .compare-track {{
     position: relative;
-    height: 8px;
+    height: 10px;
     background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
@@ -905,12 +905,12 @@ def render_html(stats, analysis, contact_name):
     margin-bottom: 10px;
   }}
   .warning-type {{
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text);
   }}
   .warning-badge {{
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     border: 1px solid;
     border-radius: 99px;
@@ -931,9 +931,9 @@ def render_html(stats, analysis, contact_name):
     align-items: center;
     gap: 14px;
   }}
-  .sternberg-label {{ font-size: 12px; font-weight: 600; color: var(--text-muted); }}
+  .sternberg-label {{ font-size: 14px; font-weight: 600; color: var(--text); }}
   .sternberg-track {{
-    height: 8px;
+    height: 10px;
     background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
@@ -942,7 +942,7 @@ def render_html(stats, analysis, contact_name):
   .s-passion    {{ background: linear-gradient(90deg, #ec4899, #f97316); }}
   .s-intimacy   {{ background: linear-gradient(90deg, #a855f7, #3b82f6); }}
   .s-commitment {{ background: linear-gradient(90deg, #22c55e, #06b6d4); }}
-  .sternberg-val {{ font-size: 14px; font-weight: 700; text-align: right; color: var(--text-muted); }}
+  .sternberg-val {{ font-size: 16px; font-weight: 700; text-align: right; color: var(--text); }}
   .sternberg-type {{
     margin-top: 8px;
     font-size: 14px;
@@ -962,12 +962,12 @@ def render_html(stats, analysis, contact_name):
     align-items: center;
   }}
   .gottman-ratio-val {{
-    font-size: 40px;
+    font-size: 48px;
     font-weight: 900;
     letter-spacing: -.03em;
     color: var(--text);
   }}
-  .gottman-ratio-label {{ font-size: 11px; color: var(--text-muted); margin-top: 4px; }}
+  .gottman-ratio-label {{ font-size: 13px; color: var(--text-muted); margin-top: 4px; }}
   .gottman-risk-badge {{
     font-size: 12px;
     font-weight: 700;
@@ -1011,12 +1011,12 @@ def render_html(stats, analysis, contact_name):
   .pt-row:last-child {{ border-bottom: none; }}
   .pt-cell {{
     padding: 14px 16px;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-muted);
     border-right: 1px solid var(--border);
   }}
   .pt-cell:last-child {{ border-right: none; }}
-  .pt-header .pt-cell {{ font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-subtle); }}
+  .pt-header .pt-cell {{ font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-subtle); }}
   .pt-you   {{ color: #f59e0b !important; font-weight: 600; }}
   .pt-them  {{ color: #a855f7 !important; font-weight: 600; }}
   .pt-label {{ font-weight: 600; color: var(--text-subtle) !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: .06em; }}
@@ -1190,7 +1190,7 @@ def render_html(stats, analysis, contact_name):
     border-radius: var(--radius);
     padding: 28px;
   }}
-  .chart-title {{ font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 20px; }}
+  .chart-title {{ font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 20px; }}
   .chart-wrap {{ position: relative; height: 180px; }}
   .charts-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
 
@@ -1204,19 +1204,19 @@ def render_html(stats, analysis, contact_name):
     padding: 24px;
   }}
   .analysis-card-title {{
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: .1em;
     text-transform: uppercase;
-    color: var(--text-subtle);
+    color: var(--text);
     margin-bottom: 16px;
   }}
 
   /* ── Footer ── */
   .footer {{
     text-align: center;
-    padding: 32px 24px;
-    font-size: 11px;
+    padding: 36px 24px;
+    font-size: 13px;
     color: var(--text-subtle);
     border-top: 1px solid var(--border);
     letter-spacing: .03em;
@@ -1235,7 +1235,7 @@ def render_html(stats, analysis, contact_name):
   /* ── Score Description ── */
   .score-desc {{
     margin-top: 10px;
-    font-size: 12px;
+    font-size: 14px;
     color: var(--text-muted);
     line-height: 1.6;
     text-align: left;
@@ -1375,8 +1375,8 @@ def render_html(stats, analysis, contact_name):
     padding: 16px 12px;
     text-align: center;
   }}
-  .lang-card-label {{ font-size: 10px; font-weight: 600; color: var(--text-subtle); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 8px; }}
-  .lang-card-val   {{ font-size: 18px; font-weight: 800; margin-bottom: 4px; }}
+  .lang-card-label {{ font-size: 11px; font-weight: 600; color: var(--text-subtle); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 8px; }}
+  .lang-card-val   {{ font-size: 14px; font-weight: 500; margin-bottom: 4px; line-height: 1.5; }}
   .lang-card-sub   {{ font-size: 10px; color: var(--text-subtle); }}
   .lang-stats-row {{
     display: flex;
@@ -1961,10 +1961,10 @@ const base = {{
     legend: {{ display: false }},
     tooltip: {{
       backgroundColor: '#18181f',
-      borderColor: 'rgba(255,255,255,0.06)',
+      borderColor: 'rgba(255,255,255,0.07)',
       borderWidth: 1,
-      titleColor: '#f0f0f5',
-      bodyColor: '#6b6b80',
+      titleColor: '#f5f5fa',
+      bodyColor: '#a0a0b8',
       padding: 12,
     }}
   }}
@@ -1987,8 +1987,8 @@ new Chart(document.getElementById('trendChart'), {{
   options: {{
     ...base,
     scales: {{
-      x: {{ ticks: {{ color: '#3a3a4a', maxTicksLimit: 8, font: {{ size: 11 }} }}, grid: {{ color: 'rgba(255,255,255,0.03)' }}, border: {{ display: false }} }},
-      y: {{ ticks: {{ color: '#3a3a4a', font: {{ size: 11 }} }}, grid: {{ color: 'rgba(255,255,255,0.03)' }}, border: {{ display: false }} }}
+      x: {{ ticks: {{ color: '#6a6a80', maxTicksLimit: 8, font: {{ size: 13 }} }}, grid: {{ color: 'rgba(255,255,255,0.04)' }}, border: {{ display: false }} }},
+      y: {{ ticks: {{ color: '#6a6a80', font: {{ size: 13 }} }}, grid: {{ color: 'rgba(255,255,255,0.04)' }}, border: {{ display: false }} }}
     }}
   }}
 }});
@@ -2008,8 +2008,8 @@ new Chart(document.getElementById('hourChart'), {{
   options: {{
     ...base,
     scales: {{
-      x: {{ ticks: {{ color: '#3a3a4a', font: {{ size: 10 }}, maxTicksLimit: 8 }}, grid: {{ display: false }}, border: {{ display: false }} }},
-      y: {{ ticks: {{ color: '#3a3a4a', font: {{ size: 10 }} }}, grid: {{ color: 'rgba(255,255,255,0.03)' }}, border: {{ display: false }} }}
+      x: {{ ticks: {{ color: '#6a6a80', font: {{ size: 13 }}, maxTicksLimit: 8 }}, grid: {{ display: false }}, border: {{ display: false }} }},
+      y: {{ ticks: {{ color: '#6a6a80', font: {{ size: 13 }} }}, grid: {{ color: 'rgba(255,255,255,0.04)' }}, border: {{ display: false }} }}
     }}
   }}
 }});
@@ -2032,7 +2032,7 @@ new Chart(document.getElementById('pieChart'), {{
       legend: {{
         display: true,
         position: 'bottom',
-        labels: {{ color: '#6b6b80', font: {{ size: 11 }}, padding: 16, boxWidth: 10 }}
+        labels: {{ color: '#a0a0b8', font: {{ size: 13 }}, padding: 16, boxWidth: 10 }}
       }}
     }},
     cutout: '65%'
