@@ -35,10 +35,43 @@ description: >-
 
 ### Step 0: 平台选择
 
-向用户提问并等待回答：「你要分析哪个平台的聊天记录？微信（WeChat）还是 QQ？」
+向用户提问并等待回答：「你要分析哪个平台的聊天记录？微信（WeChat）、QQ，还是已有导出文件（WeFlow JSON）？」
 
 - **微信路径** → Step 1 → Step 2 → Step 3 → Step 4 → Step 5 → Step 6
 - **QQ 路径** → Step QQ-1 → Step QQ-2 → Step QQ-3 → Step QQ-4 → Step 6
+- **WeFlow 导出文件** → Step WF-1 → Step 6
+
+---
+
+### ══════════════ WeFlow 导入路径 ══════════════
+
+### Step WF-1: WeFlow 文件转换
+
+当用户提供 WeFlow 格式的 JSON 导出文件时，使用 `scripts/convert_weflow.py` 转换为内部格式：
+
+```bash
+<PYTHON> scripts/convert_weflow.py \
+  --input "<用户提供的 WeFlow JSON 路径>" \
+  --output data/contacts \
+  --own-wxid "<用户自己的 wxid>" \
+  --display-name "<联系人显示名>" \
+  --wxid "<联系人 wxid>"
+```
+
+参数说明：
+- `--input`: WeFlow 导出的 JSON 文件路径（必填）
+- `--output`: 输出目录，通常为 `data/contacts`（必填）
+- `--own-wxid`: 用户自己的微信 wxid。如省略，脚本会从 `isSend=1` 的消息中自动检测
+- `--display-name`: 联系人显示名称。如省略，使用 remark 或 nickname
+- `--wxid`: 联系人的 wxid。如省略，使用 session.wxid
+
+脚本会输出 `data/contacts/<wxid>_weflow/messages.json` 和 `emojis.json`，
+后续分析流程与微信/QQ 路径的 Step 6 完全一致。
+
+**使用场景**：
+- 用户已通过 WeFlow 导出聊天记录 JSON 文件
+- 微信解密失败需要绕过解密流程
+- 用户直接上传了 WeFlow 格式的聊天备份
 
 ---
 
@@ -226,4 +259,5 @@ description: >-
 | 微信未运行 | 提示用户打开微信 |
 | 找不到联系人 | 列出相似名字供用户重新选择 |
 | 数据库解密失败 | 检查 `vendor/wechat-decrypt/config.json` 中的 `db_dir` |
-| messages.json 不存在 | 提示先运行 Step 5 提取消息 |
+| WeFlow 文件解析失败 | 确认文件为有效的 WeFlow 格式（包含 weflow/session/messages 字段） |
+| messages.json 不存在 | 提示先运行 Step 5 或 Step WF-1 提取消息 |
