@@ -268,6 +268,27 @@ py -m pip install -r requirements.txt
 
 如果你只分析 QQ，很多情况下即使不装也能跑通，但为了少踩坑，建议统一安装。
 
+如果你使用的是 macOS 或 Linux，且 Python 版本 ≥ 3.11，直接执行 pip install 可能会报错：
+
+```txt
+error: externally-managed-environment
+```
+
+请使用虚拟环境来安装依赖:
+
+第一步：创建虚拟环境 
+```
+python3 -m venv venv
+```   
+第二步：激活虚拟环境   
+```
+source venv/bin/activate
+```   
+第三步：安装依赖（此时在虚拟环境中）   
+```
+pip install -r requirements.txt
+```
+
 ### 2.4 微信用户额外准备
 
 新用户不要运行 `setup_check.py --ensure-decryptor`：原上游已因 DMCA 被屏蔽。Windows 微信当前使用 weflow-cli，失败时使用 CipherTalk。下面的微信章节会完整说明。
