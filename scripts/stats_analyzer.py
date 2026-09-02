@@ -150,6 +150,14 @@ def detect_bombing(messages):
                 my_consecutive = 0
         last_sender = sender
 
+    # 收尾：最后一段连续消息同样要计入轰炸与最大连发
+    if last_sender == "me" and my_consecutive >= 3:
+        my_bombs += 1
+    if last_sender == "them" and their_consecutive >= 3:
+        their_bombs += 1
+    my_max_consecutive = max(my_max_consecutive, my_consecutive)
+    their_max_consecutive = max(their_max_consecutive, their_consecutive)
+
     return {
         "my_bomb_count": my_bombs,
         "their_bomb_count": their_bombs,
@@ -242,9 +250,9 @@ def analyze_linguistics(text_messages, all_messages):
         content = msg["content"]
         sender = msg["sender"]
 
-        # 代词统计
-        we_count = content.count("我们") + content.count("咱们") + content.count("咱")
-        i_count = content.count("我") - we_count * 2  # 排除"我们"中的"我"
+        # 代词统计："我们"含一个"我"、"咱们/咱"不含"我"，均不计入单数"我"
+        we_count = content.count("我们") + content.count("咱")
+        i_count = content.count("我") - content.count("我们")
         i_count = max(i_count, 0)
 
         # 模糊词统计
