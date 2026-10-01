@@ -39,7 +39,8 @@ GAP_THRESHOLD = 24 * 3600  # 24 小时沉默 = 修复时刻边界
 
 
 def load_messages(path):
-    with open(path, encoding="utf-8") as f:
+    # 与 stats_analyzer.py 一致，容忍 Windows 编辑器写入的 BOM
+    with open(path, encoding="utf-8-sig") as f:
         return json.load(f)
 
 
@@ -226,9 +227,9 @@ def build_generate(data, since_str, output_path):
     me_count = sum(1 for m in scoped if m.get("sender") == "me")
     them_count = sum(1 for m in scoped if m.get("sender") == "them")
 
-    # 最近 30 天
+    # 最近 30 天（保留窗口内最新的 200 条，而非最旧的）
     recent_cutoff = last_ts - 30 * 86400
-    recent_msgs = [m for m in text_msgs if m["timestamp"] >= recent_cutoff][:200]
+    recent_msgs = [m for m in text_msgs if m["timestamp"] >= recent_cutoff][-200:]
 
     # 修复时刻
     repair_chunks = find_repair_moments(all_msgs)
@@ -244,7 +245,8 @@ def build_generate(data, since_str, output_path):
         f.write(f"总消息数: {total} 条（含非文字消息）\n")
         f.write(f"文字消息: {len(text_msgs)} 条\n")
         f.write(f"我方发送: {me_count} 条 | 对方发送: {them_count} 条\n")
-        f.write(f"发起占比: 我方 {me_count/total*100:.1f}% | 对方 {them_count/total*100:.1f}%\n")
+        f.write(f"消息占比: 我方 {me_count/total*100:.1f}% | 对方 {them_count/total*100:.1f}%\n")
+        f.write("（注意：以上为消息量占比；对话发起统计请以 stats.json 的 initiative 为准）\n")
         f.write("\n⚠️ 以下为分层采样关键窗口，不代表全量记录。\n")
         f.write("   统计层全量数据请参见 data/stats.json。\n")
 
