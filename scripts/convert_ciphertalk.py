@@ -39,6 +39,7 @@ def convert_payload(data, contact, contact_id=None):
         message_type = normalize_external_type(local_type)
         record = {
             "local_id": raw.get("localId", raw.get("messageId", index)),
+            "source_message_id": raw.get("serverId") or raw.get("msgSvrId") or raw.get("messageId") or raw.get("localId"),
             "sender": sender,
             "timestamp": raw.get("createTime", raw.get("timestamp")),
             "type": message_type,
@@ -58,6 +59,7 @@ def convert_payload(data, contact, contact_id=None):
         "source": "ciphertalk",
         "contact_username": contact_id or contact,
         "contact_display": contact,
+        "account_id": data.get("meta", {}).get("ownerId", "unknown") if isinstance(data, dict) else "unknown",
         "messages": converted,
     }
 
@@ -74,12 +76,13 @@ def main():
         data = json.load(handle)
     payload = convert_payload(data, args.contact, args.contact_id)
     normalized, bundle = write_contact_bundle(
-        payload, args.contact, args.contact_id, args.output_dir
+        payload, args.contact, args.contact_id, args.output_dir, args.input
     )
     print(json.dumps({
         "status": "ok", "source": "ciphertalk", "total": normalized["total"],
         "dropped": normalized["normalization"]["dropped_messages"],
         "bundle_dir": bundle["bundle_dir"], "messages_path": bundle["messages_path"],
+        "import": normalized["last_import"],
     }, ensure_ascii=False))
 
 
