@@ -39,7 +39,8 @@ GAP_THRESHOLD = 24 * 3600  # 24 小时沉默 = 修复时刻边界
 
 
 def load_messages(path):
-    with open(path, encoding="utf-8") as f:
+    # 与 stats_analyzer.py 一致，容忍 Windows 编辑器写入的 BOM
+    with open(path, encoding="utf-8-sig") as f:
         return json.load(f)
 
 
@@ -190,7 +191,8 @@ def format_msg(m):
     sender = "我" if m.get("sender") == "me" else "TA"
     content = analytical_text(m) or str(m.get("content", "")).strip()
     prefix = "[语音转写] " if m.get("type") == "voice" and analytical_text(m) else ""
-    return f"[{fmt_ts(m['timestamp'])}] {sender}: {prefix}{content}"
+    identity = f" [id={m['message_id']}]" if m.get("message_id") else ""
+    return f"[{fmt_ts(m['timestamp'])}]{identity} {sender}: {prefix}{content}"
 
 
 def write_window(f, title, msgs):
@@ -226,9 +228,9 @@ def build_generate(data, since_str, output_path):
     me_count = sum(1 for m in scoped if m.get("sender") == "me")
     them_count = sum(1 for m in scoped if m.get("sender") == "them")
 
-    # 最近 30 天
+    # 最近 30 天（保留窗口内最新的 200 条，而非最旧的）
     recent_cutoff = last_ts - 30 * 86400
-    recent_msgs = [m for m in text_msgs if m["timestamp"] >= recent_cutoff][:200]
+    recent_msgs = [m for m in text_msgs if m["timestamp"] >= recent_cutoff][-200:]
 
     # 修复时刻
     repair_chunks = find_repair_moments(all_msgs)
@@ -239,12 +241,14 @@ def build_generate(data, since_str, output_path):
         # 概览头
         f.write("=" * 60 + "\n")
         f.write("=== 聊天记录分析范围概览 ===\n")
+        f.write(f"messages_digest: {data.get('messages_digest', '未记录')}\n")
         f.write("=" * 60 + "\n")
         f.write(f"时间范围: {fmt_ts(first_ts)} ~ {fmt_ts(last_ts)}\n")
         f.write(f"总消息数: {total} 条（含非文字消息）\n")
         f.write(f"文字消息: {len(text_msgs)} 条\n")
         f.write(f"我方发送: {me_count} 条 | 对方发送: {them_count} 条\n")
-        f.write(f"发起占比: 我方 {me_count/total*100:.1f}% | 对方 {them_count/total*100:.1f}%\n")
+        f.write(f"消息占比: 我方 {me_count/total*100:.1f}% | 对方 {them_count/total*100:.1f}%\n")
+        f.write("（注意：以上为消息量占比；对话发起统计请以 stats.json 的 initiative 为准）\n")
         f.write("\n⚠️ 以下为分层采样关键窗口，不代表全量记录。\n")
         f.write("   统计层全量数据请参见 data/stats.json。\n")
 
