@@ -20,6 +20,8 @@
 
 ## Windows 微信：weflow-cli（首选）
 
+已知兼容性反馈：[Issue #31](https://github.com/863401402/she-love-me/issues/31) 报告 Windows 微信 4.1.13.65 下两条提取路径失败，尚未验证修复。扫描返回空账号时，不要解释为账号不匹配；检查结构化错误码和诊断信息。两条路径均失败时转已有 JSON/Markdown 导入，不要循环登录重试或声称已适配该版本。
+
 适用：Windows 10/11、微信 4.x、Python 3.9+、Node.js 18+、管理员终端。
 
 ### WX-1 环境检查与安装

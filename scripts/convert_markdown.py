@@ -6,8 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-from contact_bundle import resolve_bundle_paths
-from message_normalizer import normalize_payload
+from external_chat_import import write_contact_bundle
 
 
 if sys.platform == "win32":
@@ -52,21 +51,19 @@ def main():
     args = parser.parse_args()
 
     source = Path(args.input)
-    payload = normalize_payload({
+    payload = {
         "source": "markdown",
         "contact_username": args.contact_id or args.contact,
         "contact_display": args.contact,
         "messages": parse_markdown(source.read_text(encoding="utf-8-sig"), args.my_name),
-    })
-    bundle = resolve_bundle_paths(
-        args.contact, args.contact_id or args.contact, output_dir=args.output_dir
+    }
+    payload, bundle = write_contact_bundle(
+        payload, args.contact, args.contact_id, args.output_dir, args.input
     )
-    payload["bundle_dir"] = bundle["bundle_dir"]
-    Path(bundle["bundle_dir"]).mkdir(parents=True, exist_ok=True)
-    Path(bundle["messages_path"]).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({
         "status": "ok", "source": "markdown", "total": payload["total"],
         "bundle_dir": bundle["bundle_dir"], "messages_path": bundle["messages_path"],
+        "import": payload["last_import"],
     }, ensure_ascii=False))
 
 

@@ -1,10 +1,7 @@
 """Shared helpers for importing JSON produced by external chat exporters."""
 
-import json
-from pathlib import Path
-
 from contact_bundle import resolve_bundle_paths
-from message_normalizer import normalize_payload
+from bundle_store import update_bundle
 
 
 NUMERIC_TYPE_MAP = {
@@ -70,12 +67,7 @@ def content_or_placeholder(content, message_type):
     return text or PLACEHOLDERS.get(message_type, "")
 
 
-def write_contact_bundle(payload, contact, contact_id, output_dir):
-    normalized = normalize_payload(payload, drop_invalid=True)
+def write_contact_bundle(payload, contact, contact_id, output_dir, source_path=None):
     bundle = resolve_bundle_paths(contact, contact_id or contact, output_dir=output_dir)
-    normalized["bundle_dir"] = bundle["bundle_dir"]
-    Path(bundle["bundle_dir"]).mkdir(parents=True, exist_ok=True)
-    Path(bundle["messages_path"]).write_text(
-        json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    normalized = update_bundle(payload, bundle["messages_path"], source_path)
     return normalized, bundle

@@ -10,6 +10,11 @@ import os
 import re
 import sys
 from datetime import datetime
+from pathlib import Path
+
+from analysis_evidence import validate_evidence, resolve_stats_field
+from bundle_store import atomic_json
+from message_normalizer import digest, normalize_payload
 
 # Windows 控制台 UTF-8 输出
 if sys.platform == "win32":
@@ -358,6 +363,10 @@ def render_key_findings(key_findings):
         title    = escape_html(f.get("title", f"发现{i+1}"))
         quote    = escape_html(f.get("quote", ""))
         analysis = escape_html(f.get("analysis", ""))
+        links = " ".join(
+            f'<a href="#evidence-{escape_html(mid)}">原始消息 {index + 1}</a>'
+            for index, mid in enumerate(f.get("evidence_message_ids", []))
+        )
         items.append(f"""
         <div class="finding-card">
           <div class="finding-index">{i+1:02d}</div>
@@ -365,6 +374,7 @@ def render_key_findings(key_findings):
             <div class="finding-title">{title}</div>
             {f'<blockquote class="finding-quote">「{quote}」</blockquote>' if quote else ''}
             <p class="finding-analysis">{analysis}</p>
+            <div class="stat-sub">{links or '旧版结论未关联消息证据'}</div>
           </div>
         </div>""")
     return "\n".join(items)
@@ -412,22 +422,45 @@ def render_relationship_stage(rel_stage):
     </div>"""
 
 
-def render_emotional_asymmetry(asym):
+def render_emotional_asymmetry(asym, calibration=None):
     """渲染情感不对称分析"""
-    if not asym:
+    if not asym and not calibration:
         return ""
-    score       = asym.get("symmetry_score", 5)
+    asym = asym or {}
+    score       = calibration.get("symmetry_score") if calibration else asym.get("symmetry_score")
     anchor      = asym.get("anchor_person", "me")
     anchor_desc = escape_html(asym.get("anchor_description", ""))
     conflict    = escape_html(asym.get("conflict_pattern", ""))
     power_dyn   = escape_html(asym.get("power_dynamics", ""))
     turning     = asym.get("key_turning_point", {})
 
-    score_pct = int(score / 10 * 100)
+    if score is not None and (isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= score <= 10):
+        raise ValueError("对称性评分必须在 0–10 范围内或为 null")
+    score_pct = int(score / 10 * 100) if score is not None else 0
+    score_display = score if score is not None else "数据不足"
+    score_unit = "/10" if score is not None else ""
     anchor_label = "你" if anchor == "me" else "对方"
     float_label  = "对方" if anchor == "me" else "你"
 
-    score_color = "#a855f7" if score >= 7 else ("#eab308" if score >= 4 else "#ef4444")
+    score_color = "#a855f7" if score is not None and score >= 7 else ("#eab308" if score is not None and score >= 4 else "#ef4444")
+    calibration_html = ""
+    roles_html = f'<span class="asym-role anchor-role">⚓ {anchor_label} = 锚</span><span class="asym-role float-role">🪁 {float_label} = 浮标</span>'
+    if calibration:
+        labels = {"initiative": "对话发起", "reply": "回复间隔", "resumption": "沉默后恢复", "messages": "消息量"}
+        items = []
+        for key, dimension in calibration["dimensions"].items():
+            value = dimension["value"]
+            description = f"{value * 10:.1f}/10" if value is not None else f"数据不足：{dimension['reason']}"
+            items.append(f"<li>{labels[key]}：{escape_html(description)}（权重 {dimension['weight'] * 100:.0f}%）</li>")
+        calibration_html = (
+            f'<div class="asym-power"><p>有效权重覆盖 {calibration["coverage"] * 100:.0f}% · 评分版本 {escape_html(calibration["version"])}</p>'
+            f'<ul>{"".join(items)}</ul><p>{escape_html(calibration["reason"])}</p>'
+            f'<p>{escape_html(calibration["limitations"])}</p></div>'
+        )
+        direction = calibration["investment_direction"]["observed_direction"]
+        direction_label = {"me": "消息量和发起占比偏向你", "them": "消息量和发起占比偏向对方",
+                           "mixed_or_balanced": "消息量与发起方向均衡、混合或样本不足"}[direction]
+        roles_html = f'<span class="asym-role">{direction_label}</span>'
 
     turning_html = ""
     if turning and turning.get("date"):
@@ -446,18 +479,18 @@ def render_emotional_asymmetry(asym):
     <div class="asym-wrap">
       <div class="asym-score-row">
         <div class="asym-score-info">
-          <div class="asym-score-val" style="color:{score_color}">{score}<span style="font-size:.5em;font-weight:500;color:var(--text-muted)">/10</span></div>
-          <div class="asym-score-label">情感对称性</div>
+          <div class="asym-score-val" style="color:{score_color}">{score_display}<span style="font-size:.5em;font-weight:500;color:var(--text-muted)">{score_unit}</span></div>
+          <div class="asym-score-label">聊天行为对称性</div>
         </div>
         <div class="asym-roles">
-          <span class="asym-role anchor-role">⚓ {anchor_label} = 锚</span>
-          <span class="asym-role float-role">🪁 {float_label} = 浮标</span>
+          {roles_html}
         </div>
       </div>
       <div class="asym-bar-track"><div class="asym-bar-fill" style="width:{score_pct}%;background:{score_color};"></div></div>
       {f'<p class="asym-anchor-desc">{anchor_desc}</p>' if anchor_desc else ''}
       {f'<div class="asym-conflict"><span class="asym-conflict-label">冲突模式</span> {conflict}</div>' if conflict else ''}
       {power_html}
+      {calibration_html}
       {turning_html}
     </div>"""
 
@@ -659,7 +692,37 @@ def render_patriarch_wisdom(wisdom):
     </div>"""
 
 
-def render_html(stats, analysis, contact_name):
+def render_evidence(stats, analysis, payload=None):
+    index, entries = validate_evidence(stats, analysis, payload)
+    if not entries:
+        return '<section class="stat-card"><h2>证据回查</h2><p>本报告未提供结构化证据引用，结论尚未校验原始消息关联。</p></section>'
+    cards = []
+    referenced = set()
+    for path, entry in entries:
+        ids = entry.get("evidence_message_ids", [])
+        referenced.update(ids)
+        links = " · ".join(f'<a href="#evidence-{mid}">消息 {i+1}</a>' for i, mid in enumerate(ids))
+        fields = "<br>".join(
+            f'{escape_html(field)}：{escape_html(json.dumps(resolve_stats_field(stats, field), ensure_ascii=False))}'
+            for field in entry.get("stats_fields", [])
+        )
+        title = entry.get("title") or entry.get("claim") or path
+        cards.append(f'<div class="stat-card"><h3>{escape_html(title)}</h3><p>{links}</p><p>{fields}</p></div>')
+    for mid in sorted(referenced, key=lambda item: (index[item]["timestamp"], item)):
+        message = index[mid]
+        timestamp = datetime.fromtimestamp(message["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+        sender = "我" if message["sender"] == "me" else "对方"
+        content = message.get("transcript") or message.get("content", "")
+        cards.append(f'<div class="stat-card" id="evidence-{mid}"><h3>{timestamp} · {sender}</h3>'
+                     f'<p style="white-space:pre-wrap">{escape_html(content)}</p>'
+                     f'<small style="overflow-wrap:anywhere">{mid}</small></div>')
+    version_note = ("统计、分析与消息数据摘要一致。" if stats.get("messages_digest") and analysis.get("messages_digest")
+                    else "旧版统计或分析缺少数据摘要，数据版本绑定尚未完成。")
+    return '<section><h2>证据回查</h2><p>已校验引用存在及所提供原文匹配。' + version_note + '语境推断仍需结合完整对话。</p>' + "\n".join(cards) + '</section>'
+
+
+def render_html(stats, analysis, contact_name, messages=None):
+    evidence_html = render_evidence(stats, analysis, messages)
     scores    = stats.get("scores", {})
     simp      = scores.get("simp_index", 0)
     loved     = scores.get("loved_index", 0)
@@ -686,7 +749,7 @@ def render_html(stats, analysis, contact_name):
     strategist_html        = render_strategist(analysis.get("strategist", {}))
     findings_html          = render_key_findings(analysis.get("key_findings", []))
     relationship_stage_html = render_relationship_stage(analysis.get("relationship_stage"))
-    emotional_asym_html    = render_emotional_asymmetry(analysis.get("emotional_asymmetry"))
+    emotional_asym_html    = render_emotional_asymmetry(analysis.get("emotional_asymmetry"), stats.get("balance_calibration"))
     portrait_html          = render_personality_portrait(analysis.get("personality_portrait"), contact_name)
     lang_patterns_html     = render_language_patterns(
         analysis.get("language_patterns"), linguistic_stats, contact_name
@@ -701,7 +764,16 @@ def render_html(stats, analysis, contact_name):
     total_days = basic.get("total_days", 1)
     my_ratio   = int(basic.get("my_ratio", 0) * 100)
     their_ratio = int(basic.get("their_ratio", 0) * 100)
-    speed_ratio = reply.get("speed_ratio", 1)
+    speed_ratio = reply.get("speed_ratio")
+    speed_ratio_display = escape_html(speed_ratio) if speed_ratio is not None else "数据不足"
+    speed_ratio_unit = "x" if speed_ratio is not None else ""
+    my_reply_display = escape_html(reply.get("my_avg_human") or "数据不足")
+    their_reply_display = escape_html(reply.get("their_avg_human") or "数据不足")
+    sample_display = (
+        f"有效样本：你 {reply['my_sample_count']} 条 / 对方 {reply['their_sample_count']} 条"
+        if "my_sample_count" in reply and "their_sample_count" in reply
+        else "旧版统计未记录样本数，建议重新统计"
+    )
 
     trend_icon = {"升温中": "🔥", "平稳维持": "➡️", "逐渐降温": "❄️", "已经凉透": "💀"}.get(
         analysis.get("relationship_trend", ""), "📊"
@@ -1787,14 +1859,16 @@ def render_html(stats, analysis, contact_name):
         <div class="stat-sub">对方 {initiative.get('their_starts', 0)} 次</div>
       </div>
       <div class="stat-card">
-        <div class="stat-meta">你的回复速度</div>
-        <div class="stat-main" style="font-size:20px;font-weight:800">{reply.get('my_avg_human', 'N/A')}</div>
-        <div class="stat-sub">对方 {reply.get('their_avg_human', 'N/A')}</div>
+        <div class="stat-meta">平均回复间隔</div>
+        <div class="stat-main" style="font-size:20px;font-weight:800">{my_reply_display}</div>
+        <div class="stat-sub">对方 {their_reply_display}</div>
+        <div class="stat-sub">{escape_html(sample_display)}</div>
       </div>
       <div class="stat-card">
         <div class="stat-meta">回速差距</div>
-        <div class="stat-main">{speed_ratio}<span style="font-size:.45em;font-weight:500;color:var(--text-muted)">x</span></div>
-        <div class="stat-sub">对方比你慢这么多倍</div>
+        <div class="stat-main">{speed_ratio_display}<span style="font-size:.45em;font-weight:500;color:var(--text-muted)">{speed_ratio_unit}</span></div>
+        <div class="stat-sub">对方平均间隔 / 你的平均间隔</div>
+        <div class="stat-sub">仅统计相邻双方消息的 10 秒至 24 小时间隔，不代表已读时间</div>
       </div>
       <div class="stat-card">
         <div class="stat-meta">你的轰炸次数</div>
@@ -1959,6 +2033,7 @@ def render_html(stats, analysis, contact_name):
     </div>
   </section>
 
+{evidence_html}
 </main>
 
 <footer class="footer">
@@ -1970,7 +2045,7 @@ def render_html(stats, analysis, contact_name):
     放下这份冰冷的报告，去现实里，用真心换真心。<br>
     爱情从来不需要算法背书，它只需要你，开口。
   </p>
-  仅供参考 · 数据本地处理，不上传任何服务器 · <a href="https://github.com/863401402/she-love-me" target="_blank" style="color:inherit;opacity:.6;text-decoration:none;">她不一样 · 开源地址</a> · {date_str}
+  仅供参考 · 导出与统计在本地执行，AI 分析的数据流取决于所选模型 · 本页字体与图表库需联网加载 · <a href="https://github.com/863401402/she-love-me" target="_blank" style="color:inherit;opacity:.6;text-decoration:none;">她不一样 · 开源地址</a> · {date_str}
 </footer>
 
 <script>
@@ -2070,24 +2145,41 @@ def main():
     parser.add_argument("--analysis", required=True)
     parser.add_argument("--contact", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--messages", help="证据回查所需 messages.json；默认寻找 stats.json 同目录文件")
     args = parser.parse_args()
 
     stats = load_json(args.stats)
     analysis = load_json(args.analysis)
+    messages_path = Path(args.messages) if args.messages else Path(args.stats).parent / "messages.json"
+    messages = load_json(messages_path) if messages_path.exists() else None
+    if args.messages and messages is None:
+        raise ValueError("指定的 --messages 文件不存在")
 
-    html = render_html(stats, analysis, args.contact)
+    html = render_html(stats, analysis, args.contact, messages)
 
     os.makedirs(args.output, exist_ok=True)
-    date_tag = datetime.now().strftime("%Y%m%d_%H%M")
+    date_tag = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     safe_name = re.sub(r'[^\w\-]', '_', args.contact) if args.contact else "contact"
     out_path = os.path.join(args.output, f"{safe_name}_{date_tag}.html")
 
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
+    atomic_json(Path(out_path).with_suffix(".manifest.json"), {
+        "report_schema_version": "2.1", "created_at": datetime.now().astimezone().isoformat(),
+        "messages_digest": normalize_payload(messages)["messages_digest"] if messages else None,
+        "analysis_digest": digest(analysis), "stats_digest": digest(stats),
+        "scoring_version": stats.get("scoring_version"),
+        "model": analysis.get("model"), "prompt_version": analysis.get("prompt_version"),
+        "stats_snapshot": stats, "analysis_snapshot": analysis,
+    })
 
     print(f"[+] 报告已生成: {out_path}", file=sys.stderr)
     print(json.dumps({"status": "ok", "path": out_path}))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        sys.exit(1)

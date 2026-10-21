@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from run_ciphertalk_scanner import ScannerError
+
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -56,10 +58,12 @@ def weixin_processes():
 def read_miyu_config(path=None):
     config_path = Path(path) if path else Path.home() / ".miyu" / "config.json"
     try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
+        data = json.loads(config_path.read_text(encoding="utf-8-sig"))
+        if not isinstance(data, dict):
+            raise ValueError("miyu 配置必须是 JSON 对象")
     except FileNotFoundError:
         data = {}
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         return {
             "path": str(config_path), "readable": False, "error": str(exc),
             "has_key": False, "key_format_valid": False,
@@ -203,7 +207,11 @@ def run_headless_scanner(account_path, download=False, config_path=None):
     except json.JSONDecodeError as exc:
         raise RuntimeError("CipherTalk 无界面扫描器未返回有效结果") from exc
     if result.returncode != 0 or payload.get("status") != "ok":
-        raise RuntimeError(payload.get("error") or "CipherTalk 无界面密钥扫描失败")
+        raise ScannerError(
+            payload.get("error") or "CipherTalk 无界面密钥扫描失败",
+            diagnostic=payload.get("diagnostic"), method=payload.get("method"),
+            code=payload.get("error_code"),
+        )
     return payload
 
 
@@ -261,7 +269,9 @@ def main():
     roots = list(args.search_root)
     if args.db_path:
         roots.insert(0, args.db_path)
-    report = build_report(roots)
+    if args.configure and args.config_path:
+        raise RuntimeError("--configure 仅支持 miyu 默认配置；自定义 --config-path 可用于诊断和扫描")
+    report = build_report(roots, config_path=args.config_path)
     if args.configure:
         candidates = report["candidates"]
         if not candidates:
@@ -301,6 +311,12 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except ScannerError as exc:
+        print(json.dumps({
+            "status": "error", "error": str(exc), "error_code": exc.code,
+            "method": exc.method, "diagnostic": exc.diagnostic,
+        }, ensure_ascii=False), file=sys.stderr)
+        sys.exit(1)
     except (OSError, RuntimeError, ValueError) as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)

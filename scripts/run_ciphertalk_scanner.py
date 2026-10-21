@@ -12,10 +12,11 @@ import setup_ciphertalk_scanner
 
 
 class ScannerError(RuntimeError):
-    def __init__(self, message, diagnostic=None, method=None):
+    def __init__(self, message, diagnostic=None, method=None, code=None):
         super().__init__(message)
         self.diagnostic = diagnostic
         self.method = method
+        self.code = code
 
 
 if sys.platform == "win32":
@@ -78,6 +79,7 @@ def run_scanner(account_path, component_dir, config_path=None, node="node"):
             payload.get("error") or "密钥扫描失败",
             diagnostic=payload.get("diagnostic"),
             method=payload.get("method"),
+            code=payload.get("errorCode"),
         )
     return payload
 
@@ -125,6 +127,7 @@ if __name__ == "__main__":
         print(json.dumps({
             "status": "error", "error": str(exc), "method": exc.method,
             "diagnostic": exc.diagnostic,
+            "error_code": exc.code,
         }, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
     except (OSError, RuntimeError, ValueError) as exc:

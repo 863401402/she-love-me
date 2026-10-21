@@ -6,26 +6,62 @@
 
 ## 评分推导规则
 
+### 证据回查协议（analysis schema_version 2.1）
+
+新分析必须加入顶层 `schema_version: "2.1"` 和 `messages_digest`，摘要从当前 `stats.json` 或 `chat_history.txt` 原样复制，不自行编造。每条 `key_findings` 和 `danger_warnings` 必须带非空 `evidence_message_ids`，ID 从采样文件 `[id=msg_...]` 原样复制。引用依据仍应满足下方分析框架，不因具备 ID 就视为推断成立。
+
+```json
+{
+  "schema_version": "2.1",
+  "messages_digest": "复制当前消息数据的 SHA-256 摘要",
+  "prompt_version": "evidence-2.1",
+  "model": "填写实际使用的模型，未知则 null",
+  "key_findings": [
+    {
+      "title": "对方表达想念",
+      "quote": "想你",
+      "analysis": "本次对话中对方直接表达想念，单条表达不足以判断长期承诺。",
+      "evidence_level": "low",
+      "evidence_message_ids": ["复制真实消息的完整 msg_ ID"],
+      "stats_fields": ["basic.total_messages"]
+    }
+  ]
+}
+```
+
+上例为字段示意，不可直接拿占位符生成报告。`evidence_level` 可为 `high` / `medium` / `low` / `insufficient`；引用 `quote` 必须是关联消息正文或转写的真实连续片段，多条消息的引用分别填写。`stats_fields` 使用点分路径（如 `initiative.my_starts`），字段必须存在；缺失值不得充当中高等级证据。其他分析模块也可以加入这两个引用数组，报告会递归校验并展示。
+
+报告生成时传入 `--messages "<bundle_dir>/messages.json"`，省略时会寻找 `stats.json` 同目录的消息文件。统计、分析和消息摘要不一致，或 ID / 原文不匹配时停止生成；重新统计并重做分析后再生成。每份报告的 `.manifest.json` 保存对应统计和分析快照，允许复查当时的结论；引用存在的校验不等于语境推断已被证明。
+
+### 统计可靠性约定（stats_version 2.2）
+
+- `reply_speed.my_avg_seconds` / `their_avg_seconds` / `speed_ratio` 在无有效样本时为 `null`。先检查 `my_sample_count` / `their_sample_count`，不得把 `null` 当作 0 秒、秒回或不回复的证据。
+- 回复间隔口径是相邻双方消息的 10 秒至 24 小时间隔，另有中位数和 P90；不包含阅读状态。不得仅凭间隔写“已读不回”。
+- 对称性评分从 `balance_calibration` 原样读取；缺失维度、权重覆盖及原因由统计引擎返回，不能把缺失维度当作平衡。
+- `cold_response` 只表示词表候选命中，`requires_context=true`；`my_short_count` / `their_short_count` 是中性的短句统计。不能把“嗯”“哈哈”“好的”等词表命中直接认定为冷淡，要结合相邻对话。
+- 冷淡词表比例以各方 `my_text_count` / `their_text_count` 为分母，避免表情和图片稀释文字比例。没有文本样本不代表态度热情。
+- `scoring_version=2.2` 的分数为行为启发式指标；不得解释为爱情概率。比较历史报告前，使用同一算法版本重新统计，并核对有效维度与权重覆盖是否一致。
+
 在填写以下三类评分前，**必须先从 `data/stats.json` 读取对应字段**，以统计数据为基础推导，再用文本证据校正，不得凭感觉直接写数字。
 
 ### 对称性评分（symmetry_score，0–10）
 
-从 `stats.json` 读取并计算加权分：
+从 `stats.json.balance_calibration.symmetry_score` 原样读取（包括 `null`），不得由 Agent 自行打分或文本调分。报告优先展示统计引擎结果；证据版分析中的分数与引擎不一致时会停止生成。
 
-```
-symmetry_score = round(
-  (1 - me_initiation_ratio) * 3.0      +  // 发起占比：我越主动分越低（权重 0.3）
-  reply_balance_score * 2.0             +  // 回复速度差：差距越大分越低（权重 0.2）
-  repair_balance_score * 3.0            +  // 修复发起比：越不对等分越低（权重 0.3）
-  message_ratio_balance * 2.0             // 消息量比：越偏离 50/50 分越低（权重 0.2）
-, 1)
+引擎对四个维度都使用 `2 × min(双方观测值) / (双方观测值之和)`，值域 0–1，交换双方后结果不变：
 
-// reply_balance_score = max(0, 1 - abs(me_avg_reply_sec - them_avg_reply_sec) / 86400)
-// repair_balance_score = them_repair_count / (me_repair_count + them_repair_count + 1)
-// message_ratio_balance = 1 - abs(me_ratio - 0.5) * 2
-```
+| 维度 | 观测值 | 权重 | 最小样本 |
+| --- | --- | --- | --- |
+| initiative | 双方对话发起次数 | 30% | 合计 4 次 |
+| reply | 双方有效回复间隔中位数 | 20% | 各 3 个有效间隔 |
+| resumption | 双方在超过 24 小时沉默后恢复发言的次数 | 30% | 合计 2 次 |
+| messages | 双方消息量 | 20% | 合计 20 条 |
 
-**必须在输出中说明**：「对称性评分 X，基于：你发起对话占比 XX%，双方平均回复时间差 XX 小时，修复发起比 X:X，消息量比 XX:XX」
+仅当消息量和对话发起维度有效、且有效权重覆盖至少 70% 时输出分数：`round(10 × 有效维度加权和 / 有效权重覆盖, 1)`；否则为 `null`。样本门槛和权重是项目启发式规则，尚未经过实证校准，不代表统计置信度。
+
+`investment_direction` 独立描述双方消息量、发起、沉默后恢复的占比。只有消息量和发起占比均超过 60% / 低于 40% 时，标为偏向我方 / 对方；不能从低对称分数推断偏向哪一方，更不能据此断言谁更爱谁。
+
+必须说明分数、有效权重覆盖、缺失维度及原因。没有长沉默样本不代表恢复行为对等；沉默后恢复不等于冲突修复。文本分析独立记录在 `symmetry_derivation`、`anchor_description` 等字段，并附证据。若量化低分且文本与方向共同支持明显单向投入，再按危险预警双阈值规则处理。
 
 ### Sternberg 三角（passion / intimacy / commitment，各 0–100）
 

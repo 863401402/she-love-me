@@ -19,10 +19,13 @@ import argparse
 import json
 import os
 import sys
+import math
+from statistics import median
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from message_normalizer import analytical_text, normalize_payload
+from scoring_calibration import calibrate_balance
 
 # Windows 控制台 UTF-8 输出
 if sys.platform == "win32":
@@ -95,8 +98,8 @@ def detect_conversations(messages):
     return conversations
 
 
-def analyze_reply_times(messages):
-    """计算双方平均回复时间（秒）"""
+def summarize_reply_times(messages):
+    """统计相邻双方消息间隔；没有样本时返回 null，不代表已读时间。"""
     my_reply_times = []
     their_reply_times = []
     last_sender = None
@@ -113,9 +116,32 @@ def analyze_reply_times(messages):
         last_sender = msg["sender"]
         last_time = msg["timestamp"]
 
-    avg_my = sum(my_reply_times) / len(my_reply_times) if my_reply_times else 0
-    avg_their = sum(their_reply_times) / len(their_reply_times) if their_reply_times else 0
-    return avg_my, avg_their
+    result = {
+        "method": "adjacent_sender_change",
+        "minimum_gap_seconds": 10,
+        "maximum_gap_seconds": 86400,
+        "read_receipts_available": False,
+    }
+    for prefix, samples in (("my", my_reply_times), ("their", their_reply_times)):
+        ordered = sorted(samples)
+        average = round(sum(samples) / len(samples), 1) if samples else None
+        result.update({
+            f"{prefix}_sample_count": len(samples),
+            f"{prefix}_avg_seconds": average,
+            f"{prefix}_avg_human": fmt_duration(average),
+            f"{prefix}_median_seconds": median(samples) if samples else None,
+            f"{prefix}_p90_seconds": ordered[math.ceil(len(ordered) * 0.9) - 1] if ordered else None,
+        })
+    my_avg = result["my_avg_seconds"]
+    their_avg = result["their_avg_seconds"]
+    result["speed_ratio"] = round(their_avg / my_avg, 1) if my_avg and their_avg else None
+    return result
+
+
+def analyze_reply_times(messages):
+    """保留双值接口，缺少有效样本时返回 None。"""
+    summary = summarize_reply_times(messages)
+    return summary["my_avg_seconds"], summary["their_avg_seconds"]
 
 
 def detect_bombing(messages):
@@ -128,9 +154,10 @@ def detect_bombing(messages):
     their_max_consecutive = 0
 
     last_sender = None
+    last_time = None
     for msg in messages:
         sender = msg["sender"]
-        if sender == last_sender:
+        if sender == last_sender and msg["timestamp"] - last_time <= NEW_CONVERSATION_GAP:
             if sender == "me":
                 my_consecutive += 1
             else:
@@ -149,6 +176,15 @@ def detect_bombing(messages):
                 their_consecutive = 1
                 my_consecutive = 0
         last_sender = sender
+        last_time = msg["timestamp"]
+
+    # 收尾：最后一段连续消息同样要计入轰炸与最大连发
+    if last_sender == "me" and my_consecutive >= 3:
+        my_bombs += 1
+    if last_sender == "them" and their_consecutive >= 3:
+        their_bombs += 1
+    my_max_consecutive = max(my_max_consecutive, my_consecutive)
+    their_max_consecutive = max(their_max_consecutive, their_consecutive)
 
     return {
         "my_bomb_count": my_bombs,
@@ -159,14 +195,21 @@ def detect_bombing(messages):
 
 
 def detect_cold_replies(text_messages):
-    """检测冷淡回复"""
+    """统计词表候选；短句本身不代表冷淡，仍需上下文校正。"""
     my_cold = 0
     their_cold = 0
+    short_counts = {"me": 0, "them": 0}
+    text_counts = {"me": 0, "them": 0}
     cold_word_count = defaultdict(int)
 
     for msg in text_messages:
         content = msg["content"].strip()
-        is_cold = content in COLD_WORDS or len(content) <= 2
+        if not content:
+            continue
+        text_counts[msg["sender"]] += 1
+        if len(content) <= 2:
+            short_counts[msg["sender"]] += 1
+        is_cold = content in COLD_WORDS
         if is_cold:
             cold_word_count[content] += 1
             if msg["sender"] == "me":
@@ -177,6 +220,11 @@ def detect_cold_replies(text_messages):
     return {
         "my_cold_count": my_cold,
         "their_cold_count": their_cold,
+        "my_short_count": short_counts["me"],
+        "their_short_count": short_counts["them"],
+        "my_text_count": text_counts["me"],
+        "their_text_count": text_counts["them"],
+        "requires_context": True,
         "cold_words": dict(sorted(cold_word_count.items(), key=lambda x: -x[1])[:10]),
     }
 
@@ -187,24 +235,25 @@ def detect_unanswered(messages):
     their_unanswered = 0
     last_sender = None
     last_time = None
-    pending_sender = None
 
     for msg in messages:
         if last_sender is not None and msg["sender"] != last_sender:
             gap = msg["timestamp"] - last_time
-            if gap > 7200 and pending_sender:  # >2小时
-                if pending_sender == "me":
+            if gap > 7200:  # 从上一方最后一条消息到对方下一条消息，>2小时
+                if last_sender == "me":
                     my_unanswered += 1
                 else:
                     their_unanswered += 1
-            pending_sender = None
-        else:
-            pending_sender = msg["sender"]
 
         last_sender = msg["sender"]
         last_time = msg["timestamp"]
 
-    return {"my_unanswered": my_unanswered, "their_unanswered": their_unanswered}
+    return {
+        "my_unanswered": my_unanswered, "their_unanswered": their_unanswered,
+        "threshold_seconds": 7200,
+        "method": "completed_sender_change_gap",
+        "read_receipts_available": False,
+    }
 
 
 def detect_goodnight(text_messages):
@@ -242,9 +291,9 @@ def analyze_linguistics(text_messages, all_messages):
         content = msg["content"]
         sender = msg["sender"]
 
-        # 代词统计
-        we_count = content.count("我们") + content.count("咱们") + content.count("咱")
-        i_count = content.count("我") - we_count * 2  # 排除"我们"中的"我"
+        # 代词统计："我们"含一个"我"、"咱们/咱"不含"我"，均不计入单数"我"
+        we_count = content.count("我们") + content.count("咱")
+        i_count = content.count("我") - content.count("我们")
         i_count = max(i_count, 0)
 
         # 模糊词统计
@@ -323,11 +372,9 @@ def compute_scores(stats):
     # 回复速度差（你比对方快多少）
     my_speed = reply["my_avg_seconds"]
     their_speed = reply["their_avg_seconds"]
-    if their_speed > 0 and my_speed > 0:
+    if their_speed and my_speed:
         speed_ratio = their_speed / my_speed
         simp_score += 20 * min(speed_ratio / 10, 1.0)
-    elif my_speed > 0 and their_speed == 0:
-        simp_score += 20
 
     # 连续轰炸
     bomb_ratio = bombing["my_bomb_count"] / max(total_starts, 1)
@@ -339,7 +386,7 @@ def compute_scores(stats):
         my_gn_ratio = goodnight["my_goodnight"] / total_goodnight
         simp_score += 10 * min(my_gn_ratio / 0.8, 1.0)
 
-    # 已读不回忍受
+    # 长时间未回复（消息记录无法证明已读）
     if unanswered["my_unanswered"] > 5:
         simp_score += 10
 
@@ -356,7 +403,7 @@ def compute_scores(stats):
     loved_score += 25 * min(initiative["their_starts"] / max(total_starts * 0.4, 1), 1.0)
 
     # 对方回复速度快
-    if their_speed > 0 and my_speed > 0:
+    if their_speed and my_speed:
         their_responsiveness = my_speed / their_speed
         loved_score += 20 * min(their_responsiveness / 3, 1.0)
 
@@ -373,16 +420,18 @@ def compute_scores(stats):
         loved_score += 10 * min(their_gn_ratio / 0.6, 1.0)
 
     # 对方不敷衍（冷淡少）
-    their_cold_ratio = cold["their_cold_count"] / max(their_total, 1)
-    loved_score += 10 * (1 - min(their_cold_ratio / 0.3, 1.0))
+    their_text_total = cold.get("their_text_count", their_total)
+    their_cold_ratio = cold["their_cold_count"] / max(their_text_total, 1)
+    if their_text_total > 0:
+        loved_score += 10 * (1 - min(their_cold_ratio / 0.3, 1.0))
 
     loved_index = min(int(loved_score), 100)
 
     # === 冷淡指数（对方对你的冷淡程度）===
     cold_score = 0.0
-    cold_ratio = cold["their_cold_count"] / max(their_total, 1)
+    cold_ratio = their_cold_ratio
     cold_score += 40 * min(cold_ratio / 0.3, 1.0)
-    if their_speed > 0 and my_speed > 0 and their_speed > my_speed * 5:
+    if their_speed and my_speed and their_speed > my_speed * 5:
         cold_score += 30
     if their_total > 0 and my_total / their_total > 2:
         cold_score += 30
@@ -396,6 +445,8 @@ def compute_scores(stats):
 
 
 def fmt_duration(seconds):
+    if seconds is None:
+        return "数据不足"
     if seconds < 60:
         return f"{int(seconds)} 秒"
     if seconds < 3600:
@@ -450,7 +501,7 @@ def main():
     their_starts = sum(1 for c in conversations if c[0]["sender"] == "them")
 
     # 回复速度
-    avg_my_reply, avg_their_reply = analyze_reply_times(valid)
+    reply_summary = summarize_reply_times(valid)
 
     # 轰炸
     bombing = detect_bombing(valid)
@@ -487,6 +538,10 @@ def main():
         type_counts[m["type"]][m["sender"]] += 1
 
     stats = {
+        "stats_version": "2.2",
+        "scoring_version": "2.2",
+        "messages_digest": data["messages_digest"],
+        "identity_namespace": data["identity_namespace"],
         "contact": contact_display,
         "basic": {
             "total_messages": total,
@@ -503,13 +558,7 @@ def main():
             "their_starts": their_starts,
             "my_start_ratio": round(my_starts / max(my_starts + their_starts, 1), 3),
         },
-        "reply_speed": {
-            "my_avg_seconds": round(avg_my_reply),
-            "their_avg_seconds": round(avg_their_reply),
-            "my_avg_human": fmt_duration(avg_my_reply),
-            "their_avg_human": fmt_duration(avg_their_reply),
-            "speed_ratio": round(avg_their_reply / max(avg_my_reply, 1), 1),
-        },
+        "reply_speed": reply_summary,
         "message_length": {
             "my_avg_chars": round(my_avg_len, 1),
             "their_avg_chars": round(their_avg_len, 1),
@@ -546,6 +595,7 @@ def main():
         "me_repair_count": me_repair,
         "them_repair_count": them_repair,
     }
+    stats["balance_calibration"] = calibrate_balance(stats)
 
     # 近 30 天子统计（供 C3/C6 双阈值验证）
     last_ts = max(timestamps) if timestamps else 0

@@ -15,6 +15,34 @@ import diagnose_ciphertalk
 
 
 class CipherTalkDiagnosticTests(unittest.TestCase):
+    def test_config_accepts_bom_and_rejects_non_object_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            config = Path(temp) / "config.json"
+            config.write_text('{"dbPath":"C:/custom"}', encoding="utf-8-sig")
+            self.assertEqual(diagnose_ciphertalk.read_miyu_config(config)["db_path"], "C:/custom")
+            config.write_text('[]', encoding="utf-8")
+            self.assertFalse(diagnose_ciphertalk.read_miyu_config(config)["readable"])
+
+    @patch.object(diagnose_ciphertalk, "build_report")
+    @patch.object(diagnose_ciphertalk.sys, "argv", ["diagnose", "--config-path", "custom.json"])
+    def test_cli_uses_custom_config_for_initial_diagnosis(self, build_report):
+        build_report.return_value = {"status": "ok"}
+        diagnose_ciphertalk.main()
+        build_report.assert_called_once_with([], config_path="custom.json")
+
+    @patch.object(diagnose_ciphertalk.subprocess, "run")
+    def test_scan_failure_keeps_diagnostics_and_code(self, run):
+        run.return_value.returncode = 1
+        run.return_value.stdout = ""
+        run.return_value.stderr = json.dumps({
+            "status": "error", "error": "empty account", "error_code": "SCANNER_EMPTY_ACCOUNT",
+            "method": "active-account", "diagnostic": {"candidateCount": 526},
+        })
+        with self.assertRaises(diagnose_ciphertalk.ScannerError) as raised:
+            diagnose_ciphertalk.run_headless_scanner("C:/account")
+        self.assertEqual(raised.exception.code, "SCANNER_EMPTY_ACCOUNT")
+        self.assertEqual(raised.exception.diagnostic, {"candidateCount": 526})
+
     def test_scan_key_cli_accepts_private_config_path(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPTS_DIR / "diagnose_ciphertalk.py"),

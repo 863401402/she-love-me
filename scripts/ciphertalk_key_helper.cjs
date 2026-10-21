@@ -116,11 +116,22 @@ function scanActiveAccount(koffi, library, privateKey, accountPath) {
   const key = typeof result?.db_key === 'string' ? result.db_key.trim() : '';
   const expectedWxid = path.basename(path.resolve(accountPath));
   const returnedWxid = String(result?.wxid || '').trim();
+  if (!result || !returnedWxid) {
+    return {
+      key: '', method: 'active-account', databaseValidated: false, diagnostic: null,
+      error: '扫描组件未返回有效账号信息；可能不支持当前微信版本，不能据此判断账号不匹配',
+      errorCode: 'SCANNER_EMPTY_ACCOUNT',
+    };
+  }
   const accountMatches = returnedWxid && (
     returnedWxid === expectedWxid || expectedWxid.startsWith(`${returnedWxid}_`)
   );
   if (/^wxid_/i.test(expectedWxid) && !accountMatches) {
-    throw new Error('扫描到的当前微信账号与已配置数据目录不匹配');
+    return {
+      key: '', method: 'active-account', databaseValidated: false, diagnostic: null,
+      error: '扫描到的当前微信账号与已配置数据目录不匹配',
+      errorCode: 'ACCOUNT_MISMATCH',
+    };
   }
   return { key, method: 'active-account', databaseValidated: false, diagnostic: null };
 }
@@ -151,7 +162,7 @@ function main() {
   const privateKey = privateKeyFromOfficialSource(path.resolve(args.source));
   const result = scanKey(koffi, library, privateKey, path.resolve(args['account-path']));
   if (!/^[0-9a-fA-F]{64}$/.test(result.key)) {
-    output({ ok: false, error: '未扫描到可验证的数据库密钥', method: result.method, diagnostic: result.diagnostic }, 1);
+    output({ ok: false, error: result.error || '未扫描到可验证的数据库密钥', errorCode: result.errorCode || 'KEY_NOT_FOUND', method: result.method, diagnostic: result.diagnostic }, 1);
     return;
   }
   const configPath = args['config-path'] || path.join(os.homedir(), '.miyu', 'config.json');
@@ -165,8 +176,12 @@ function main() {
   });
 }
 
-try {
-  main();
-} catch (error) {
-  output({ ok: false, error: error instanceof Error ? error.message : String(error) }, 1);
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    output({ ok: false, error: error instanceof Error ? error.message : String(error) }, 1);
+  }
 }
+
+module.exports = { scanKey, scanActiveAccount };
