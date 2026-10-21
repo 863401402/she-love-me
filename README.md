@@ -54,9 +54,9 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/863401402/she-love-me/main/assets/ai-image-group-qr.jpg" width="220" alt="恋爱分析交流群" />
+<img src="assets/ai-image-group-qr.jpg" width="220" alt="恋爱分析交流群二维码（2026年10月28日前有效）" />
 
-*扫码加入恋爱分析交流群，遇到问题、分享分析结果、更新优化方向都可以聊*
+*扫码加入恋爱分析交流群；当前二维码预计在 2026 年 10 月 28 日前有效，过期后请以仓库最新图片为准。*
 
 </div>
 
