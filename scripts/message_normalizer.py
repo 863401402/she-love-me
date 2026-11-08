@@ -1,11 +1,37 @@
 """Normalize imported chat messages into the she-love-me data contract."""
 
 import math
+import hashlib
+import json
+from collections import defaultdict
 from datetime import datetime, timezone
 
 
 MIN_TIMESTAMP = datetime(2000, 1, 1, tzinfo=timezone.utc).timestamp()
 MAX_TIMESTAMP = datetime(2100, 1, 1, tzinfo=timezone.utc).timestamp()
+
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
+                                     separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def message_namespace(payload):
+    return {
+        "source": payload.get("source") or "normalized",
+        "account": payload.get("account_id") or payload.get("own_wxid") or "unknown",
+        "contact": payload.get("contact_username") or payload.get("contact_display") or "unknown",
+    }
+
+
+def message_signature(message):
+    return {key: message.get(key) for key in ("sender", "timestamp", "type", "content")}
+
+
+def messages_digest(messages):
+    """Bind statistics/analysis to message content, including later transcripts."""
+    return digest([{**message_signature(m), "message_id": m["message_id"],
+                    "transcript": m.get("transcript")} for m in messages])
 
 
 def normalize_timestamp(value):
@@ -76,9 +102,26 @@ def normalize_payload(payload, drop_invalid=False):
             warnings.append({"index": index, "error": str(exc)})
 
     normalized.sort(key=lambda item: (item["timestamp"], str(item.get("local_id", ""))))
+    namespace = message_namespace(payload)
+    occurrences = defaultdict(int)
+    for message in normalized:
+        source_id = message.get("source_message_id")
+        if source_id not in (None, ""):
+            identity = {"source_id": str(source_id)}
+            message["identity_method"] = "source_id"
+        else:
+            fingerprint = digest(message_signature(message))
+            occurrences[fingerprint] += 1
+            identity = {"fingerprint": fingerprint, "occurrence": occurrences[fingerprint]}
+            message["identity_method"] = "content_occurrence"
+        message["message_id"] = "msg_" + digest({"namespace": namespace, **identity})
+    normalized.sort(key=lambda item: (item["timestamp"], item["message_id"]))
     result = dict(payload)
+    result["schema_version"] = "2.0"
+    result["identity_namespace"] = namespace
     result["messages"] = normalized
     result["total"] = len(normalized)
+    result["messages_digest"] = messages_digest(normalized)
     result["normalization"] = {
         "timestamp_unit": "seconds",
         "dropped_messages": len(warnings),

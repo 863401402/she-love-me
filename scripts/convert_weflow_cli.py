@@ -41,6 +41,7 @@ def convert_payload(data, contact, contact_id=None, own_wxid=None):
         content = raw.get("parsedContent") or raw.get("content") or raw.get("rawContent")
         record = {
             "local_id": raw.get("localId", index),
+            "source_message_id": raw.get("serverId") or raw.get("msgSvrId") or raw.get("localId"),
             "sender": "me" if sent is True else "them" if sent is False else "unknown",
             "timestamp": raw.get("createTime", raw.get("timestamp")),
             "type": message_type,
@@ -73,12 +74,13 @@ def main():
         data = json.load(handle)
     payload = convert_payload(data, args.contact, args.contact_id, args.own_wxid)
     normalized, bundle = write_contact_bundle(
-        payload, args.contact, args.contact_id, args.output_dir
+        payload, args.contact, args.contact_id, args.output_dir, args.input
     )
     print(json.dumps({
         "status": "ok", "source": "weflow-cli", "total": normalized["total"],
         "dropped": normalized["normalization"]["dropped_messages"],
         "bundle_dir": bundle["bundle_dir"], "messages_path": bundle["messages_path"],
+        "import": normalized["last_import"],
     }, ensure_ascii=False))
 
 

@@ -191,7 +191,8 @@ def format_msg(m):
     sender = "我" if m.get("sender") == "me" else "TA"
     content = analytical_text(m) or str(m.get("content", "")).strip()
     prefix = "[语音转写] " if m.get("type") == "voice" and analytical_text(m) else ""
-    return f"[{fmt_ts(m['timestamp'])}] {sender}: {prefix}{content}"
+    identity = f" [id={m['message_id']}]" if m.get("message_id") else ""
+    return f"[{fmt_ts(m['timestamp'])}]{identity} {sender}: {prefix}{content}"
 
 
 def write_window(f, title, msgs):
@@ -240,6 +241,7 @@ def build_generate(data, since_str, output_path):
         # 概览头
         f.write("=" * 60 + "\n")
         f.write("=== 聊天记录分析范围概览 ===\n")
+        f.write(f"messages_digest: {data.get('messages_digest', '未记录')}\n")
         f.write("=" * 60 + "\n")
         f.write(f"时间范围: {fmt_ts(first_ts)} ~ {fmt_ts(last_ts)}\n")
         f.write(f"总消息数: {total} 条（含非文字消息）\n")

@@ -268,7 +268,19 @@ py -m pip install -r requirements.txt
 
 如果你只分析 QQ，很多情况下即使不装也能跑通，但为了少踩坑，建议统一安装。
 
+macOS/Linux 建议使用虚拟环境，避免系统 Python 的 `externally-managed-environment` 安装限制：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+激活后，本文中的 `py` 命令应改为 `python`。虚拟环境只解决依赖安装；微信密钥提取仍取决于平台和微信版本兼容性。
+
 ### 2.4 微信用户额外准备
+
+Windows 微信 4.1.13.65 有用户报告两条密钥提取路径均失败，尚未验证修复，见 [Issue #31](https://github.com/863401402/she-love-me/issues/31)。扫描组件返回空账号时，不能据此认定账号或目录不匹配；可改用已有 JSON/Markdown，不要反复登录或公开密钥。
 
 新用户不要运行 `setup_check.py --ensure-decryptor`：原上游已因 DMCA 被屏蔽。Windows 微信当前使用 weflow-cli，失败时使用 CipherTalk。下面的微信章节会完整说明。
 
