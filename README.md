@@ -62,6 +62,18 @@
 
 ---
 
+## 支持项目
+
+「她不一样」是一个 Agent 驱动的聊天记录分析 Skill，支持微信、QQ 聊天记录导入、统计、采样分析和 HTML 报告生成。
+
+现在已在 WorkBuddy 上架付费版本。付费版与 GitHub 开源版功能相同，购买主要用于支持项目后续维护。
+
+如果这个项目对你有帮助，欢迎通过 [WorkBuddy 支持「她不一样」](https://www.workbuddy.cn/share/asset?shareCode=VTlAzPUNM0CQ3E6BhYzcyz&sig=nhYVIJtCw8oGveqf)。
+
+GitHub 开源版仍可免费使用，也欢迎 Star、Issue 和 PR。
+
+---
+
 ## 输出效果
 
 > 首次运行后，打开 Agent 返回的 HTML 路径；联系人报告通常位于 `data/contacts/<联系人目录>/reports/`。每份报告旁边有对应的 `.manifest.json` 快照。
