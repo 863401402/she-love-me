@@ -114,16 +114,17 @@ description: >-
   4. 全量（8234 条，2024-06-15 ~ 今天）
 ```
 
-等待用户选择后，**阶段 2：生成分层采样文件**：
+等待用户选择后，**阶段 2：生成分层采样文件**。`date_from` 和 `date_until` 都按 UTC 日期解释，结束日期包含当天：
 
 ```bash
 <PYTHON> scripts/build_chat_history.py \
   --input "<messages_path>" \
   --output "<bundle_dir>/chat_history.txt" \
-  --since <用户选择对应的 date_from>
+  --since <用户选择对应的 date_from> \
+  --until <用户选择对应的 date_until>
 ```
 
-如果用户选择全量，省略 `--since` 参数。
+如果用户选择全量，省略 `--since` 和 `--until` 参数。只指定起始日期时，范围延伸到最后一条消息。
 
 ### Step 7: AI 深度鉴定（核心）
 

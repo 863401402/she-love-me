@@ -40,6 +40,23 @@ class TimestampNormalizationTests(unittest.TestCase):
         self.assertEqual([item["content"] for item in payload["messages"]], ["前", "后"])
         self.assertEqual(payload["normalization"]["dropped_messages"], 1)
 
+    def test_same_timestamp_messages_keep_numeric_source_order(self):
+        payload = normalize_payload({"messages": [
+            {"local_id": 1, "sender": "me", "timestamp": 1692946166, "content": "第一条"},
+            {"local_id": 2, "sender": "them", "timestamp": 1692946166, "content": "第二条"},
+            {"local_id": 10, "sender": "me", "timestamp": 1692946166, "content": "第十条"},
+        ]})
+        self.assertEqual(
+            [item["content"] for item in payload["messages"]],
+            ["第一条", "第二条", "第十条"],
+        )
+
+    def test_date_text_outside_supported_range_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "时间戳超出支持范围"):
+            normalize_timestamp("1900-01-01T00:00:00+00:00")
+        with self.assertRaisesRegex(ValueError, "时间戳超出支持范围"):
+            normalize_timestamp("2101-01-01T00:00:00+00:00")
+
 
 class ImportTests(unittest.TestCase):
     def test_markdown_import(self):

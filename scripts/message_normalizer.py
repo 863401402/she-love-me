@@ -5,6 +5,7 @@ import hashlib
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 
 MIN_TIMESTAMP = datetime(2000, 1, 1, tzinfo=timezone.utc).timestamp()
@@ -44,7 +45,7 @@ def normalize_timestamp(value):
             value = float(text)
         except ValueError:
             parsed = _parse_datetime(text)
-            return parsed.timestamp()
+            value = parsed.timestamp()
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"不支持的时间戳: {value!r}")
@@ -58,6 +59,21 @@ def normalize_timestamp(value):
     if not MIN_TIMESTAMP <= timestamp <= MAX_TIMESTAMP:
         raise ValueError(f"时间戳超出支持范围: {value!r}")
     return int(timestamp) if timestamp.is_integer() else timestamp
+
+
+def _source_order_key(value):
+    """Sort source sequence values without turning numeric IDs into text."""
+    if isinstance(value, bool):
+        return (2, str(value))
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and not math.isfinite(value):
+            return (2, str(value))
+        return (0, Decimal(str(value)))
+    try:
+        numeric = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return (1, str(value))
+    return (0, numeric)
 
 
 def _parse_datetime(text):
@@ -101,7 +117,9 @@ def normalize_payload(payload, drop_invalid=False):
                 raise ValueError(f"第 {index} 条消息无效: {exc}") from exc
             warnings.append({"index": index, "error": str(exc)})
 
-    normalized.sort(key=lambda item: (item["timestamp"], str(item.get("local_id", ""))))
+    normalized.sort(key=lambda item: (
+        item["timestamp"], _source_order_key(item.get("local_id", ""))
+    ))
     namespace = message_namespace(payload)
     occurrences = defaultdict(int)
     for message in normalized:
@@ -115,7 +133,6 @@ def normalize_payload(payload, drop_invalid=False):
             identity = {"fingerprint": fingerprint, "occurrence": occurrences[fingerprint]}
             message["identity_method"] = "content_occurrence"
         message["message_id"] = "msg_" + digest({"namespace": namespace, **identity})
-    normalized.sort(key=lambda item: (item["timestamp"], item["message_id"]))
     result = dict(payload)
     result["schema_version"] = "2.0"
     result["identity_namespace"] = namespace
@@ -151,7 +168,12 @@ def normalize_message(raw, index):
                 break
 
     message = dict(raw)
-    message["local_id"] = raw.get("local_id", raw.get("localId", index))
+    # Some exports omit local_id but provide a stable source ID; use it for
+    # same-timestamp ordering before falling back to the input position.
+    message["local_id"] = raw.get(
+        "local_id",
+        raw.get("localId", raw.get("source_message_id", index)),
+    )
     message["sender"] = sender
     message["timestamp"] = normalize_timestamp(timestamp_value)
     message["type"] = str(raw.get("type") or "text").strip().lower()

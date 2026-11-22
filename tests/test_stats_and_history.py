@@ -3,6 +3,8 @@ import sys
 import tempfile
 import subprocess
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 
@@ -17,7 +19,7 @@ from stats_analyzer import (
     analyze_reply_times, summarize_reply_times, compute_scores, detect_unanswered,
 )
 from generate_html_report import render_html
-from build_chat_history import build_generate
+from build_chat_history import build_generate, build_preview, filter_by_range
 
 
 def msg(sender, content, timestamp, type_="text"):
@@ -202,11 +204,11 @@ class PronounCountingTests(unittest.TestCase):
 
 
 class ChatHistorySamplingTests(unittest.TestCase):
-    def _generate(self, messages):
+    def _generate(self, messages, since=None, until=None):
         payload = normalize_payload({"messages": messages}, drop_invalid=True)
         with tempfile.TemporaryDirectory() as temp_dir:
             output = Path(temp_dir) / "chat_history.txt"
-            build_generate(payload, None, str(output))
+            build_generate(payload, since, str(output), until)
             return output.read_text(encoding="utf-8")
 
     def test_recent_30d_window_keeps_newest_messages(self):
@@ -226,6 +228,34 @@ class ChatHistorySamplingTests(unittest.TestCase):
         self.assertIn("消息占比", text)
         self.assertNotIn("发起占比: 我方", text)
         self.assertIn("stats.json 的 initiative", text)
+
+    def test_until_includes_the_entire_utc_end_date(self):
+        base = 1_704_067_200  # 2024-01-01 00:00 UTC
+        text = self._generate([
+            msg("me", "当天最后一条", base + 86_399),
+            msg("them", "次日第一条", base + 86_400),
+        ], since="2024-01-01", until="2024-01-01")
+        self.assertIn("当天最后一条", text)
+        self.assertNotIn("次日第一条", text)
+
+    def test_date_range_rejects_reversed_boundaries(self):
+        payload = normalize_payload({"messages": [
+            msg("me", "消息", 1_704_067_200),
+        ]})
+        with self.assertRaisesRegex(ValueError, "起始日期不能晚于结束日期"):
+            filter_by_range(payload["messages"], "2024-01-02", "2024-01-01")
+
+    def test_preview_suggestions_include_an_explicit_end_date(self):
+        base = 1_704_067_200  # 2024-01-01 00:00 UTC
+        payload = normalize_payload({"messages": [
+            msg("me", "年初", base),
+            msg("them", "年末", base + 86400 * 40),
+        ]})
+        output = StringIO()
+        with redirect_stdout(output):
+            build_preview(payload)
+        preview = json.loads(output.getvalue())
+        self.assertTrue(all("date_until" in item for item in preview["suggestions"]))
 
 
 class BomToleranceTests(unittest.TestCase):

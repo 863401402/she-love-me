@@ -6,7 +6,7 @@ build_chat_history.py - 分层采样聊天记录，供 AI 深度分析使用
 1. 预扫描（--preview）
    输出 JSON，包含时间范围选项和推荐值，供 Skill 向用户展示。
 
-2. 生成（--output + --since）
+2. 生成（--output + 可选 --since/--until）
    在用户选定的时间范围内做分层采样，输出 chat_history.txt。
    四个关键窗口：起源 / 高冲突区间 / 最近30天 / 修复时刻
 
@@ -64,6 +64,29 @@ def negative_score(text):
 # PREVIEW MODE
 # ──────────────────────────────────────────────
 
+def utc_date_boundary(value, end=False):
+    """Parse a YYYY-MM-DD boundary using the same UTC convention everywhere."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError(f"日期必须是 YYYY-MM-DD：{value!r}") from exc
+    if end:
+        parsed += timedelta(days=1)
+    return parsed.timestamp()
+
+
+def filter_by_range(msgs, since_str=None, until_str=None):
+    """Filter an inclusive UTC date range; --until includes the whole day."""
+    lower = utc_date_boundary(since_str)
+    upper = utc_date_boundary(until_str, end=True)
+    if lower is not None and upper is not None and lower >= upper:
+        raise ValueError("起始日期不能晚于结束日期")
+    return [m for m in msgs if (lower is None or m["timestamp"] >= lower)
+            and (upper is None or m["timestamp"] < upper)]
+
+
 def build_preview(data):
     msgs = data.get("messages", [])
     if not msgs:
@@ -86,15 +109,16 @@ def build_preview(data):
 
     suggestions = []
     for label, days in cutoffs:
-        since_dt = last_dt - timedelta(days=days)
-        since_ts = since_dt.timestamp()
-        count = sum(1 for m in msgs if m["timestamp"] >= since_ts)
+        since_date = (last_dt - timedelta(days=days)).date()
+        since_str = since_date.isoformat()
+        count = len(filter_by_range(msgs, since_str, last_dt.date().isoformat()))
         if days > span_days and count == total:
             continue  # 范围超过实际跨度，跳过
         suggestions.append({
             "label": label,
             "count": count,
-            "date_from": since_dt.strftime("%Y-%m-%d"),
+            "date_from": since_str,
+            "date_until": last_dt.strftime("%Y-%m-%d"),
         })
 
     # 全量选项始终添加
@@ -102,6 +126,7 @@ def build_preview(data):
         "label": "全量",
         "count": total,
         "date_from": first_dt.strftime("%Y-%m-%d"),
+        "date_until": last_dt.strftime("%Y-%m-%d"),
     })
 
     # 推荐逻辑
@@ -147,15 +172,6 @@ def build_preview(data):
 # ──────────────────────────────────────────────
 # GENERATE MODE
 # ──────────────────────────────────────────────
-
-def filter_by_since(msgs, since_str):
-    """筛选 since 日期之后的消息"""
-    if not since_str:
-        return msgs
-    since_dt = datetime.strptime(since_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    since_ts = since_dt.timestamp()
-    return [m for m in msgs if m["timestamp"] >= since_ts]
-
 
 def find_conflict_window(text_msgs, window=100):
     """找负向情绪词密度最高的连续 window 条文本消息窗口"""
@@ -204,15 +220,16 @@ def write_window(f, title, msgs):
     f.write(f"\n（共 {len(msgs)} 条）\n")
 
 
-def build_generate(data, since_str, output_path):
+def build_generate(data, since_str, output_path, until_str=None):
     msgs = data.get("messages", [])
     if not msgs:
         print(json.dumps({"error": "消息列表为空"}, ensure_ascii=False))
         sys.exit(1)
 
-    scoped = filter_by_since(msgs, since_str)
+    scoped = filter_by_range(msgs, since_str, until_str)
     if not scoped:
-        print(json.dumps({"error": f"时间范围 {since_str} 之后无消息"}, ensure_ascii=False))
+        print(json.dumps({"error": f"时间范围 {since_str or '起始'} 至 {until_str or '结束'} 无消息"},
+                         ensure_ascii=False))
         sys.exit(1)
 
     text_msgs = [
@@ -243,7 +260,7 @@ def build_generate(data, since_str, output_path):
         f.write("=== 聊天记录分析范围概览 ===\n")
         f.write(f"messages_digest: {data.get('messages_digest', '未记录')}\n")
         f.write("=" * 60 + "\n")
-        f.write(f"时间范围: {fmt_ts(first_ts)} ~ {fmt_ts(last_ts)}\n")
+        f.write(f"时间范围: {fmt_ts(first_ts)} ~ {fmt_ts(last_ts)}（UTC）\n")
         f.write(f"总消息数: {total} 条（含非文字消息）\n")
         f.write(f"文字消息: {len(text_msgs)} 条\n")
         f.write(f"我方发送: {me_count} 条 | 对方发送: {them_count} 条\n")
@@ -308,7 +325,8 @@ def main():
     parser.add_argument("--input", required=True, help="messages.json 路径")
     parser.add_argument("--preview", action="store_true", help="仅输出时间范围建议 JSON，不生成文件")
     parser.add_argument("--output", help="输出 chat_history.txt 路径（生成模式）")
-    parser.add_argument("--since", help="起始日期 YYYY-MM-DD（生成模式，不传则用全量）")
+    parser.add_argument("--since", help="起始日期 YYYY-MM-DD（含当天，生成模式）")
+    parser.add_argument("--until", help="结束日期 YYYY-MM-DD（含当天，生成模式）")
     args = parser.parse_args()
 
     if not os.path.exists(args.input):
@@ -324,7 +342,7 @@ def main():
     if args.preview:
         build_preview(data)
     elif args.output:
-        build_generate(data, args.since, args.output)
+        build_generate(data, args.since, args.output, args.until)
     else:
         parser.error("请指定 --preview 或 --output")
 

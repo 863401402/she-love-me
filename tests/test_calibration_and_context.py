@@ -129,15 +129,42 @@ class ContextTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "时间范围"):
             query_context(self.data, [self.ids[2]], since="2024-01-04")
 
-    def test_budget_marks_truncation_and_omitted_anchors(self):
+    def test_budget_preserves_anchor_and_marks_truncation(self):
         result = query_context(self.data, [self.ids[3]], before=2, after=2, max_messages=1)
         self.assertTrue(result["truncated"])
         self.assertEqual(result["returned_count"], 1)
-        self.assertEqual(result["returned_anchor_ids"], [])
+        self.assertEqual(result["returned_anchor_ids"], [self.ids[3]])
         result = query_context(self.data, keyword="想你", max_matches=1)
         self.assertTrue(result["truncated"])
         result = query_context(self.data, [self.ids[3]], max_chars=1)
         self.assertEqual(result["returned_count"], 0)
+        self.assertEqual(result["returned_anchor_ids"], [])
+        self.assertTrue(result["truncated"])
+
+    def test_long_preceding_neighbor_does_not_hide_anchor_or_short_neighbor(self):
+        data = normalize_payload({"messages": [
+            {"sender": "me", "timestamp": 1704067200, "type": "text", "content": "长" * 25000},
+            {"sender": "them", "timestamp": 1704067260, "type": "text", "content": "关键句"},
+            {"sender": "me", "timestamp": 1704067320, "type": "text", "content": "后续语境"},
+        ]})
+        ids = [message["message_id"] for message in data["messages"]]
+        result = query_context(data, [ids[1]], before=1, after=1)
+        self.assertEqual(result["returned_anchor_ids"], [ids[1]])
+        self.assertEqual([message["message_id"] for message in result["messages"]], ids[1:])
+        self.assertTrue(result["truncated"])
+        self.assertLessEqual(result["budget"]["used_chars"], result["budget"]["max_chars"])
+        self.assertEqual(result["budget"]["used_chars"],
+                         sum(len(json.dumps(message, ensure_ascii=False)) for message in result["messages"]))
+
+    def test_multiple_anchors_take_priority_over_neighbors(self):
+        result = query_context(self.data, [self.ids[1], self.ids[6]], before=1, after=1, max_messages=2)
+        self.assertEqual(result["returned_anchor_ids"], [self.ids[1], self.ids[6]])
+        self.assertEqual([message["message_id"] for message in result["messages"]], [self.ids[1], self.ids[6]])
+        self.assertTrue(result["truncated"])
+
+    def test_message_budget_prefers_nearest_neighbors_and_returns_chronological_order(self):
+        result = query_context(self.data, [self.ids[3]], before=3, after=3, max_messages=3)
+        self.assertEqual([message["message_id"] for message in result["messages"]], self.ids[2:5])
         self.assertTrue(result["truncated"])
 
     def test_invalid_queries_and_stale_digest_fail(self):

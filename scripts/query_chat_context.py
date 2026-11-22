@@ -42,18 +42,28 @@ def query_context(payload, message_ids=None, keyword=None, since=None, until=Non
     anchors = [i for i, m in enumerate(messages) if m["message_id"] in ids] if ids else [
         i for i, m in enumerate(messages) if keyword.casefold() in
         (analytical_text(m) or m.get("content", "")).casefold()]
+    selected_anchors = anchors[:max_matches]
     selected = set()
-    for index in anchors[:max_matches]:
+    for index in selected_anchors:
         selected.update(range(max(0, index - before), min(len(messages), index + after + 1)))
-    result_messages = []
+    # Reserve matching messages first, then add the closest neighbors that fit.
+    # Keep messages intact and restore chronological order for the response.
+    priority = selected_anchors + sorted(
+        selected.difference(selected_anchors),
+        key=lambda index: (min(abs(index - anchor) for anchor in selected_anchors), index),
+    )
+    result_indexes = []
     chars = 0
-    for index in sorted(selected):
+    for index in priority:
         message = messages[index]
         cost = len(json.dumps(message, ensure_ascii=False))
-        if len(result_messages) >= max_messages or chars + cost > max_chars:
+        if len(result_indexes) >= max_messages:
             break
-        result_messages.append(message)
+        if chars + cost > max_chars:
+            continue
+        result_indexes.append(index)
         chars += cost
+    result_messages = [messages[index] for index in sorted(result_indexes)]
     returned_ids = {m["message_id"] for m in result_messages}
     return {
         "status": "ok", "messages_digest": data["messages_digest"],
