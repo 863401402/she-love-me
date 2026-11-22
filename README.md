@@ -54,9 +54,9 @@
 
 <div align="center">
 
-<img src="assets/ai-image-group-qr.jpg" width="220" alt="恋爱分析交流群二维码（2026年11月15日前有效）" />
+<img src="assets/ai-image-group-qr.jpg" width="220" alt="个人微信二维码：添加好友请备注「恋爱分析skill」" />
 
-*扫码加入恋爱分析交流群；当前二维码预计在 2026 年 11 月 15 日前有效，过期后请以仓库最新图片为准。*
+扫码添加个人微信，**添加好友请备注「恋爱分析skill」**，通过后会拉进微信群。
 
 </div>
 
